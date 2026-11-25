@@ -72,3 +72,8 @@
 | Noctua NF-A12x25 PWM | 120 × 120 × 25 | [37](public/models/noctua-nf-a12x25-pwm.glb) | [Визуализация](public/asset-credits.html#noctua-nf-a12x25-pwm) | 2026-11-26 | [Производитель](https://www.noctua.at/en/products/nf-a12x25-pwm/specifications) |
 | Corsair iCUE AR120 RGB | 120 × 120 × 25 | [36](public/models/corsair-ar120-rgb.glb) | [Визуализация](public/asset-credits.html#corsair-ar120-rgb) | 2026-11-26 | [Производитель](https://www.corsair.com/us/en/p/case-fans/co-9050166-ww/icue-ar120-digital-rgb-120mm-pwm-fan-co-9050166-ww) |
 | ARCTIC P12 PWM PST A-RGB | 120 × 120 × 25 | [38](public/models/arctic-p12-pwm-pst-argb.glb) | [Визуализация](public/asset-credits.html#arctic-p12-pwm-pst-argb) | 2026-11-26 | [Производитель](https://www.arctic.de/en/P12-PWM-PST-A-RGB) |
+
+
+## Аудит метаданных 26.11.2026
+
+58/58 GLB прошли проверку структуры контейнера, конечных координат и границ POSITION, локальных ресурсов и предусмотренных монтажных маркеров. Это не декодирование Meshopt и не проверка посадки в сборке. Подтверждённых пар портов питания конкретных SKU и сертифицированных маршрутов кабелей/трубок пока нет. Новые модели и материалы не добавлены.
