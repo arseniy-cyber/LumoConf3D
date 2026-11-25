@@ -88,3 +88,47 @@ export function routePosition(route: Route, travelled: number): Vec3 {
   }
   return route.points[route.points.length - 1]
 }
+
+/** Subpath by arc length, preserving corners in either direction. */
+export function routeSlice(route: Route, from: number, to: number): Vec3[] {
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return [[NaN, NaN, NaN]]
+  const a = Math.max(0, Math.min(route.length, from))
+  const b = Math.max(0, Math.min(route.length, to))
+  if (a > b) return routeSlice(route, b, a).reverse()
+  const points = [routePosition(route, a)]
+  let travelled = 0
+  for (let i = 1; i < route.points.length; i++) {
+    travelled += distance(route.points[i - 1], route.points[i])
+    if (travelled > a && travelled < b) points.push(route.points[i])
+  }
+  points.push(routePosition(route, b))
+  return points
+}
+
+/** Try a straight exit first, then deterministic in-bay offsets. Every segment
+ * is continuously checked; no obstacle is ignored and no orientation is changed.
+ * Limits bound search cost, not a claim that every possible route was explored.
+ */
+export function planPortalExit(body: Envelope, start: Vec3, exteriorX: number, obstacles: readonly Obstacle[], clearance = SERVICE_CLEARANCE): RouteResult {
+  const direct = planSideExit(body, start, exteriorX, obstacles, clearance)
+  if (direct.route || direct.blocked.id === 'invalid-geometry') return direct
+  // A blocked starting pose needs a verified mounting-contact model, not a detour.
+  if (checkPath(body, [start], obstacles, clearance)) return direct
+  const steps = [.08, .16, .32, .48, .64, .96]
+  const offsets: [number, number][] = []
+  for (const step of steps) for (const sign of [-1, 1]) offsets.push([step * sign, 0], [0, step * sign])
+  for (const step of steps.slice(0, 4)) for (const y of [-step, step]) for (const z of [-step, step]) offsets.push([y, z])
+  offsets.sort((a, b) => Math.hypot(...a) - Math.hypot(...b))
+  let best: Route | undefined
+  for (const [y, z] of offsets) {
+    const shifted: Vec3 = [start[0], start[1] + y, start[2] + z]
+    const firstLength = distance(start, shifted)
+    if (best && firstLength + Math.max(0, start[0] - exteriorX + body.max[0] + clearance + .15) >= best.length) continue
+    if (checkPath(body, [start, shifted], obstacles, clearance)) continue
+    const exit = planSideExit(body, shifted, exteriorX, obstacles, clearance)
+    if (!exit.route) continue
+    const route = { points: [start, ...exit.route.points], length: firstLength + exit.route.length }
+    if (!best || route.length < best.length) best = route
+  }
+  return best ? { route: best } : direct
+}
