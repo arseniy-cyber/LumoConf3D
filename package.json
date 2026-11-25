@@ -1,0 +1,38 @@
+{
+  "name": "lumo-pc-builder",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && npm run check:worker && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "check:worker": "tsc --noEmit -p tsconfig.worker.json",
+    "dev:api": "wrangler dev --config wrangler.worker.jsonc --port 8788",
+    "dev:pages": "wrangler pages dev dist --port 8788",
+    "db:migrate": "wrangler d1 migrations apply lumo-builder --local",
+    "test:api": "node --experimental-strip-types tests/worker.integration.mjs",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "lucide-react": "1.80.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@types/node": "26.6.10",
+    "@types/react": "19.3.3",
+    "@types/react-dom": "19.3.0",
+    "@types/three": "0.187.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "typescript": "6.0.3",
+    "vite": "8.3.8",
+    "wrangler": "4.168.0"
+  }
+}
