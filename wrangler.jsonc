@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "lumo-pc-builder",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-11-25",
+  "vars": {
+    "DEFAULT_STORE": "lumo",
+    "TURNSTILE_SITE_KEY": "",
+    "TURNSTILE_HOSTNAMES": ""
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "lumo-builder",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

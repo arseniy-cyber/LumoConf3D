@@ -1,0 +1,66 @@
+import { expect, test } from '@playwright/test'
+
+test.use({ viewport: { width: 1120, height: 800 }, reducedMotion: 'reduce', deviceScaleFactor: 1 })
+
+test('renders the local model and keeps critical 3D controls operational', async ({ page }, testInfo) => {
+  const errors: string[] = []
+  const models = new Set<string>()
+  page.on('pageerror', error => errors.push(error.message))
+  page.on('response', response => {
+    if (response.ok() && response.url().endsWith('.glb')) models.add(response.url().split('/').at(-1)!)
+  })
+  await page.addInitScript(() => localStorage.setItem('lumo.current.v1', JSON.stringify({ options: { quality: 'low', animations: false } })))
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  const canvas = page.locator('.builder-3d-canvas')
+  await expect(canvas).toBeVisible({ timeout: 40_000 })
+  await expect(page.locator('.scene-mount')).toHaveAttribute('data-ready', 'true', { timeout: 40_000 })
+  await expect.poll(() => models.has('nzxt-h5-flow-2024.glb'), { timeout: 20_000 }).toBeTruthy()
+  await expect.poll(() => models.has('asus-dual-rtx4070-super-oc.glb'), { timeout: 20_000 }).toBeTruthy()
+  await expect(page.locator('.scene-mount')).toHaveAttribute('data-loaded-models', '9', { timeout: 25_000 })
+  const bounds = await canvas.boundingBox()
+  expect(bounds?.width).toBeGreaterThan(500)
+  await canvas.focus()
+  await page.keyboard.press('ArrowRight')
+  await page.keyboard.press('Home')
+  await page.getByRole('button', { name: 'Открыть стекло' }).click()
+  await expect(page.getByRole('button', { name: 'Закрыть стекло' })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Закрыть стекло' }).click()
+  await page.getByRole('button', { name: 'Разборка', exact: true }).click()
+  await expect(page.getByRole('slider', { name: /Степень разборки/ })).toHaveValue('0.65')
+  await page.getByRole('button', { name: 'Разборка', exact: true }).click()
+  await page.getByRole('button', { name: 'Подсветка', exact: true }).click()
+  await page.getByRole('button', { name: 'Бирюзовый', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Бирюзовый', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Лавандовый', exact: true }).click()
+  await page.getByRole('button', { name: 'Подсветка', exact: true }).click()
+  await page.getByRole('button', { name: 'Воздушный поток', exact: true }).click()
+  await expect(page.getByLabel('Показать потоки')).toBeChecked()
+  await page.getByRole('button', { name: 'Воздушный поток', exact: true }).click()
+  await page.getByRole('button', { name: 'Выключить компьютер' }).click()
+  await expect(page.getByRole('button', { name: 'Включить компьютер' })).toBeVisible()
+  await page.getByRole('button', { name: 'Включить компьютер' }).click()
+  await page.screenshot({ path: testInfo.outputPath('desktop.png'), timeout: 25_000 })
+  expect(errors).toEqual([])
+})
+
+test('a delayed model leaves the catalog responsive and a missing asset falls back', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('lumo.current.v1', JSON.stringify({ options: { quality: 'low', animations: false } })))
+  let release = () => {}
+  const gate = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/models/samsung-990-pro-2tb.glb', async route => {
+    await gate
+    await route.abort('failed')
+  })
+  try {
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+    await page.getByRole('button', { name: 'Каталог', exact: true }).click()
+    await page.getByRole('textbox', { name: 'Поиск комплектующих' }).fill('990 PRO')
+    await expect(page.locator('.catalog-item')).toHaveCount(1)
+    await page.keyboard.press('Escape')
+    release()
+    await expect(page.getByText('Для недоступных GLB показана резервная геометрия')).toBeVisible({ timeout: 35_000 })
+    await expect(page.getByRole('button', { name: 'К итогам сборки' })).toBeEnabled()
+  } finally {
+    release()
+  }
+})

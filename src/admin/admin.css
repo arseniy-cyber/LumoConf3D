@@ -1,0 +1,510 @@
+.lumo-admin {
+  --ad-background: #111216;
+  --ad-panel: #191a20;
+  --ad-raised: #22232b;
+  --ad-line: #2b2b35;
+  --ad-text: #f4f3f7;
+  --ad-muted: #a09eae;
+  --ad-accent: #a582ff;
+  --ad-accent-ink: #171021;
+  --ad-green: #72d5a8;
+  --ad-orange: #f1b181;
+  --ad-red: #fb9a9a;
+  min-height: 100dvh;
+  background: var(--ad-background);
+  color: var(--ad-text);
+  font-family: Manrope, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color-scheme: dark;
+}
+
+.lumo-admin *, .lumo-admin *::before, .lumo-admin *::after { box-sizing: border-box; }
+.lumo-admin :is(h1, h2, h3, p, ul) { margin: 0; }
+.lumo-admin :is(h1, h2, h3) { color: var(--ad-text); line-height: 1.2; }
+.lumo-admin h1 { font-size: clamp(1.9rem, 3.3vw, 2.7rem); letter-spacing: -.045em; font-weight: 760; }
+.lumo-admin h2 { font-size: 1.16rem; font-weight: 740; letter-spacing: -.018em; }
+.lumo-admin h3 { font-size: 1.03rem; font-weight: 730; }
+.lumo-admin :is(button, input, textarea, select) { font: inherit; }
+.lumo-admin a { color: inherit; }
+.lumo-admin :focus-visible { outline: 2px solid var(--ad-accent); outline-offset: 3px; }
+.lumo-admin-muted { color: var(--ad-muted); font-size: .88em; }
+.lumo-admin-spacer { flex: 1; }
+.lumo-admin-mono, .lumo-admin-code { font-family: ui-monospace, "IBM Plex Mono", monospace !important; }
+.lumo-admin-panel {
+  min-width: 0;
+  background: var(--ad-panel);
+  border: 1px solid var(--ad-line);
+  border-radius: 18px;
+}
+.lumo-admin-panel-header, .lumo-admin-toolbar, .lumo-admin-topbar, .lumo-admin-headline, .lumo-admin-login-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.lumo-admin-panel-header { padding: 20px 22px; border-bottom: 1px solid var(--ad-line); }
+.lumo-admin-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.lumo-admin-toolbar { flex-wrap: wrap; }
+.lumo-admin-stack, .lumo-admin-content { display: grid; gap: 16px; min-width: 0; }
+.lumo-admin-small-stack { display: grid; gap: 12px; }
+
+.lumo-admin-button {
+  display: inline-flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+  min-height: 39px;
+  border: 1px solid var(--ad-line);
+  border-radius: 9px;
+  padding: 8px 12px;
+  font-size: .89em !important;
+  line-height: 1.2;
+  font-weight: 720 !important;
+  white-space: nowrap;
+  background: var(--ad-raised);
+  color: var(--ad-text);
+  cursor: pointer;
+  transition: background-color .18s, color .18s, border-color .18s, opacity .18s;
+}
+.lumo-admin-button:not(:disabled):hover { background: #30313d; border-color: #444551; }
+.lumo-admin-button.is-primary { background: var(--ad-accent); border-color: var(--ad-accent); color: var(--ad-accent-ink); }
+.lumo-admin-button.is-primary:not(:disabled):hover { background: #b597ff; border-color: #b597ff; }
+.lumo-admin-button.is-quiet { background: transparent; border-color: transparent; color: var(--ad-muted); }
+.lumo-admin-button.is-danger { color: var(--ad-red); background: #2e1b24; border-color: #633a47; }
+.lumo-admin-button:disabled { opacity: .45; cursor: default; }
+.lumo-admin-button svg { flex-shrink: 0; }
+.lumo-admin-icon-action { font-size: 0 !important; min-width: 39px; padding: 8px; gap: 0; }
+.lumo-admin-icon-action svg { width: 19px; height: 19px; }
+.lumo-admin-link, .lumo-admin-quiet-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 1px;
+  font-weight: 680;
+  text-decoration: none;
+}
+.lumo-admin-quiet-link { color: var(--ad-muted) !important; }
+.lumo-admin-quiet-link:hover, .lumo-admin-link:hover { color: var(--ad-accent) !important; }
+
+.lumo-admin-layout { display: grid; grid-template-columns: 228px minmax(0, 1fr); min-height: 100dvh; }
+.lumo-admin-sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+  height: 100dvh;
+  gap: 32px;
+  padding: 24px 16px 20px;
+  background: #16171c;
+  border-right: 1px solid var(--ad-line);
+}
+.lumo-admin-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 2px 10px;
+  user-select: none;
+}
+.lumo-admin-brand-mark { display: block; flex: 0 0 auto; width: 35px; height: 35px; }
+.lumo-admin-brand strong {
+  display: block;
+  font-size: 1.51rem;
+  font-weight: 850;
+  letter-spacing: -.09em;
+  line-height: .94;
+}
+.lumo-admin-brand small {
+  display: block;
+  margin-top: 5px;
+  color: var(--ad-muted);
+  font-size: 8px;
+  font-weight: 740;
+  line-height: 1;
+  letter-spacing: .17em;
+  white-space: nowrap;
+}
+.lumo-admin-navigation { display: grid; align-content: start; gap: 5px; }
+.lumo-admin-navigation .lumo-admin-button { justify-content: flex-start; min-height: 43px; padding-inline: 11px; gap: 12px; }
+.lumo-admin-navigation [aria-current] {
+  color: #e2d4ff;
+  background: #2c233d;
+  border-color: #463660;
+}
+.lumo-admin-sidebar-footer {
+  display: grid;
+  justify-items: start;
+  align-content: end;
+  gap: 9px;
+  margin-top: auto;
+  padding: 14px 8px 0;
+  border-top: 1px solid var(--ad-line);
+}
+.lumo-admin-sidebar-footer .lumo-admin-button { padding-inline: 0; }
+
+.lumo-admin-workspace { min-width: 0; }
+.lumo-admin-topbar {
+  min-height: 71px;
+  padding: 10px clamp(16px, 4vw, 42px);
+  border-bottom: 1px solid var(--ad-line);
+  background: #15161a;
+}
+.lumo-admin-user { display: flex; min-width: 0; gap: 10px; align-items: center; }
+.lumo-admin-user div { min-width: 0; }
+.lumo-admin-user strong, .lumo-admin-user small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lumo-admin-user strong { font-size: .88em; font-weight: 710; }
+.lumo-admin-avatar {
+  display: grid;
+  place-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 1px solid #614b82;
+  border-radius: 50%;
+  background: #3a2b51;
+  color: #e0ceff;
+  font-size: .9em;
+  font-weight: 800;
+}
+.lumo-admin-store-tag {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  max-width: 48%;
+  overflow: hidden;
+  padding: 5px 9px;
+  border: 1px solid var(--ad-line);
+  border-radius: 7px;
+  background: var(--ad-panel);
+  color: var(--ad-muted);
+  font-size: .79rem;
+  font-family: ui-monospace, monospace;
+}
+.lumo-admin-store-tag i, .lumo-admin-badge i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.lumo-admin-store-tag i { flex-shrink: 0; color: var(--ad-accent); }
+.lumo-admin-main { max-width: 1550px; margin: 0 auto; padding: 34px clamp(16px, 4vw, 42px) 56px; }
+.lumo-admin-headline { margin-bottom: 23px; align-items: end; }
+.lumo-admin-headline p { margin-top: 6px; }
+.lumo-admin-main > div:has(> .lumo-admin-notice) { margin-bottom: 16px; }
+
+.lumo-admin-metrics, .lumo-admin-preset-grid, .lumo-admin-progress-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 12px;
+}
+.lumo-admin-metric { display: grid; padding: 18px; gap: 7px; align-content: start; }
+.lumo-admin-metric .lumo-admin-part-icon { margin-bottom: 9px; }
+.lumo-admin-metric strong { font-size: clamp(1.2rem, 2.5vw, 2rem); line-height: 1.13; letter-spacing: -.035em; overflow-wrap: anywhere; }
+.lumo-admin-part-icon, .lumo-admin-login-shield, .lumo-admin-empty-icon {
+  display: grid;
+  flex-shrink: 0;
+  place-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid #483963;
+  background: #2c233d;
+  color: #c4a5ff;
+}
+.lumo-admin-progress-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 19px 22px; }
+.lumo-admin-progress-row div { display: flex; gap: 8px; justify-content: space-between; }
+.lumo-admin-progress-row progress { width: 100%; height: 5px; accent-color: var(--ad-accent); }
+.lumo-admin-preset-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
+.lumo-admin-preset { display: grid; align-content: start; grid-template-rows: auto auto minmax(40px, 1fr) auto; gap: 12px; padding: 18px; }
+.lumo-admin-preset-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.lumo-admin-bottom-gap { margin-bottom: 14px; }
+
+.lumo-admin-empty { display: grid; min-height: 176px; place-content: center; justify-items: center; padding: 24px; gap: 10px; text-align: center; }
+.lumo-admin-empty p { max-width: 45ch; }
+.lumo-admin-empty-icon { margin-bottom: 1px; }
+.lumo-admin-empty .lumo-admin-button { margin-top: 4px; }
+.lumo-admin-spinner { width: 23px; height: 23px; border: 2px solid var(--ad-line); border-top-color: var(--ad-accent); border-radius: 50%; animation: lumo-admin-spin .7s linear infinite; }
+@keyframes lumo-admin-spin { to { transform: rotate(360deg); } }
+.lumo-admin-notice { border-radius: 9px; padding: 9px 12px; color: var(--ad-muted); background: #20212a; }
+.lumo-admin-notice.is-error { background: #33212a; color: var(--ad-red); }
+.lumo-admin-notice.is-success { background: #1c2b28; color: var(--ad-green); }
+
+.lumo-admin-table-wrap { overflow-x: auto; max-width: 100%; border-radius: 16px 16px 0 0; }
+.lumo-admin-table { width: 100%; min-width: 570px; border-collapse: collapse; text-align: left; }
+.lumo-admin-table th { padding: 11px 15px; color: var(--ad-muted); font-size: .82em; background: #1b1c22; }
+.lumo-admin-table td { padding: 10px 15px; border-top: 1px solid var(--ad-line); }
+.lumo-admin-table :is(th, td):first-child { padding-left: 20px; }
+.lumo-admin-table :is(th, td):last-child { padding-right: 20px; }
+.lumo-admin-table td:last-child { text-align: right; }
+.lumo-admin-table tbody tr:hover { background: #1d1e26; }
+.lumo-admin-table td:nth-last-child(2) { min-width: 114px; }
+.lumo-admin-part { display: flex; gap: 11px; align-items: center; }
+.lumo-admin-part > div, .lumo-admin-cell-price { display: grid; gap: 1px; min-width: 0; }
+.lumo-admin-label-value { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.lumo-admin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: max-content;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 50px;
+  background: #292a34;
+  color: #bcbbca;
+  font-size: .78em;
+  font-weight: 740;
+}
+.lumo-admin-badge.is-purple { color: #d3baff; background: #35274a; }
+.lumo-admin-badge.is-green { color: var(--ad-green); background: #22352e; }
+.lumo-admin-badge.is-orange { color: var(--ad-orange); background: #382c26; }
+.lumo-admin-badge.is-red { color: var(--ad-red); background: #38242d; }
+.lumo-admin-list-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 19px; border-top: 1px solid var(--ad-line); }
+
+.lumo-admin-form { display: grid; gap: 15px; }
+.lumo-admin-fields { display: grid; align-items: start; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+.lumo-admin-fields.is-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.lumo-admin-field { display: grid; min-width: 0; gap: 5px; }
+.lumo-admin-label { font-size: .84em; font-weight: 730; }
+.lumo-admin-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 9px 11px;
+  color: var(--ad-text);
+  background: #14151a;
+  border: 1px solid #363742;
+  border-radius: 8px;
+}
+.lumo-admin-input:focus-visible { outline-offset: 0; }
+.lumo-admin-input:is(:read-only, :disabled):not(select):not(textarea) { opacity: .72; }
+.lumo-admin-input::placeholder { color: #858294; }
+.lumo-admin textarea { resize: vertical; }
+.lumo-admin-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  font-size: .9em;
+}
+.lumo-admin-check input {
+  width: 16px;
+  height: 16px;
+  min-height: unset;
+  margin: 0;
+  accent-color: var(--ad-accent);
+}
+.lumo-admin-filters { flex: 1; }
+.lumo-admin-filters > select { width: auto; }
+.lumo-admin-search { display: flex; align-items: center; position: relative; flex: 0 1 205px; min-width: 145px; color: var(--ad-muted); }
+.lumo-admin-search svg { position: absolute; left: 11px; pointer-events: none; }
+.lumo-admin-search input { padding-left: 34px; }
+.lumo-admin-file { display: none; }
+.lumo-admin-settings-section { padding: 20px; display: grid; gap: 13px; }
+.lumo-admin-settings-section > .lumo-admin-muted { margin-top: -7px; }
+.lumo-admin-repeater {
+  display: grid;
+  grid-template-columns: minmax(0, .85fr) minmax(0, 1.2fr) minmax(0, .66fr) auto;
+  align-items: end;
+  gap: 10px;
+  padding: 13px;
+  background: #16171d;
+  border: 1px solid var(--ad-line);
+  border-radius: 10px;
+}
+.lumo-admin-accent { display: flex; gap: 9px; }
+.lumo-admin-accent input[type="color"] { width: 42px; height: 40px; flex-shrink: 0; padding: 3px; cursor: pointer; }
+
+.lumo-admin-dialog {
+  width: min(590px, calc(100vw - 28px));
+  max-width: unset;
+  max-height: calc(100dvh - 28px);
+  padding: 0;
+  color: var(--ad-text);
+  background: var(--ad-panel);
+  border: 1px solid #3a3847;
+  border-radius: 17px;
+}
+.lumo-admin-dialog.is-wide { width: min(820px, calc(100vw - 28px)); }
+.lumo-admin-dialog::backdrop { background: rgb(8 7 12 / .78); }
+.lumo-admin-dialog-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 19px;
+  border-bottom: 1px solid var(--ad-line);
+  background: var(--ad-panel);
+}
+.lumo-admin-dialog-header h2 { overflow-wrap: anywhere; }
+.lumo-admin-dialog-header p { margin-top: 3px; }
+.lumo-admin-dialog-body { padding: 18px; }
+.lumo-admin-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ad-line);
+  margin-top: 5px;
+}
+.lumo-admin-dialog-footer > .lumo-admin-field { min-width: 150px; }
+.lumo-admin-dialog-footer > .lumo-admin-button { max-width: 100%; }
+.lumo-admin-editor-section { display: grid; gap: 10px; padding: 13px; border: 1px solid var(--ad-line); border-radius: 12px; }
+.lumo-admin-editor-section h3 { padding-bottom: 3px; }
+.lumo-admin-details summary { cursor: pointer; color: var(--ad-muted); }
+.lumo-admin-details[open] summary { margin-bottom: 8px; }
+.lumo-admin-media, .lumo-admin-comment { display: grid; gap: 8px; }
+.lumo-admin-comment p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.lumo-admin-confirm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid #573943;
+  background: #241a24;
+  border-radius: 10px;
+}
+.lumo-admin-import-list { list-style: none; padding: 0; }
+.lumo-admin-import-list li { display: flex; justify-content: space-between; align-items: center; gap: 9px; padding: 8px 0; }
+.lumo-admin-import-list li + li { border-top: 1px solid var(--ad-line); }
+.lumo-admin-import-list li > small { flex: 0 0 auto; }
+.lumo-admin-order-info, .lumo-admin-mount-editor { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+
+.lumo-admin-mount-graph {
+  position: relative;
+  min-height: 173px;
+  margin-top: 8px;
+  overflow: hidden;
+  background-color: #13151b;
+  background-image: linear-gradient(#343545 1px, transparent 1px), linear-gradient(90deg, #343545 1px, transparent 1px);
+  background-size: 17px 17px;
+  background-position: center;
+  border: 1px solid var(--ad-line);
+  border-radius: 9px;
+  cursor: crosshair;
+  touch-action: none;
+}
+.lumo-admin-mount-graph::before, .lumo-admin-mount-graph::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  background: #6a627d;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.lumo-admin-mount-graph::before { width: 100%; height: 1px; }
+.lumo-admin-mount-graph::after { width: 1px; height: 100%; }
+.lumo-admin-mount-origin, .lumo-admin-mount-marker {
+  z-index: 1;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  border: 1px solid #b2a0ce;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.lumo-admin-mount-marker {
+  width: 20px;
+  height: 12px;
+  border: 2px solid var(--ad-accent);
+  border-radius: 3px;
+  background: #a582ff44;
+}
+.lumo-admin-mount-readout {
+  z-index: 1;
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 2px 5px;
+  background: #1a1b25;
+  color: #ccb8eb;
+  border-radius: 4px;
+  font: .73rem ui-monospace, monospace;
+  pointer-events: none;
+}
+
+.lumo-admin-login {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: radial-gradient(ellipse at 50% 51%, #221a31 0%, var(--ad-background) 60%);
+}
+.lumo-admin-login-bar { padding: 16px clamp(12px, 4vw, 32px); border-bottom: 1px solid var(--ad-line); }
+.lumo-admin-login-main { display: grid; place-items: center; padding: 30px 16px; }
+.lumo-admin-login-card { width: min(100%, 450px); padding: clamp(20px, 5vw, 34px); box-shadow: 0 22px 80px #07060d7a; }
+.lumo-admin-login-card h1 { margin-top: 14px; font-size: clamp(1.58rem, 4vw, 2.05rem); }
+.lumo-admin-login-card > p { margin-top: 7px; margin-bottom: 20px; }
+.lumo-admin-login-shield { width: 44px; height: 44px; }
+.lumo-admin-login-shield svg { width: 22px; height: 22px; }
+.lumo-admin-login-card button[type='submit'] { min-height: 45px; }
+
+@media (max-width: 1090px) {
+  .lumo-admin-layout { grid-template-columns: 184px minmax(0, 1fr); }
+  .lumo-admin-sidebar { padding-inline: 10px; }
+  .lumo-admin-preset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 800px) {
+  .lumo-admin-layout { grid-template-columns: minmax(0, 1fr); }
+  .lumo-admin-sidebar {
+    z-index: 3;
+    position: static;
+    height: auto;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 13px 0;
+    border-right: 0;
+  }
+  .lumo-admin-sidebar .lumo-admin-brand { padding-inline: 0; }
+  .lumo-admin-sidebar-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    grid-column: 2;
+    grid-row: 1;
+    margin: 0;
+    border: 0;
+    padding: 0;
+  }
+  .lumo-admin-navigation {
+    grid-column: 1 / -1;
+    display: flex;
+    overflow-x: auto;
+    padding: 2px 3px 7px;
+  }
+  .lumo-admin-navigation .lumo-admin-button { min-height: 37px; gap: 7px; }
+  .lumo-admin-topbar { min-height: 58px; }
+  .lumo-admin-main { padding-top: 24px; }
+}
+@media (max-width: 585px) {
+  .lumo-admin-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .lumo-admin-progress-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .lumo-admin-preset-grid { grid-template-columns: minmax(0, 1fr); }
+  .lumo-admin-preset p { min-height: unset; }
+  .lumo-admin-metric { padding: 13px; }
+  .lumo-admin-user small { font-size: .75em; }
+  .lumo-admin-quiet-link { font-size: .84em; }
+  .lumo-admin-headline { align-items: start; }
+  .lumo-admin-headline > button { min-height: 37px; padding-inline: 8px; }
+  .lumo-admin-headline > button svg { width: 14px; height: 14px; }
+  .lumo-admin-mount-editor, .lumo-admin-fields { grid-template-columns: minmax(0, 1fr); }
+  .lumo-admin-repeater { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lumo-admin-dialog-footer > .lumo-admin-field { min-width: 130px; }
+  .lumo-admin-dialog-body { padding: 13px; }
+}
+@media (max-width: 345px) {
+  .lumo-admin-sidebar-footer .lumo-admin-button svg { display: none; }
+  .lumo-admin-metric strong { font-size: 1.075rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lumo-admin *, .lumo-admin *::before, .lumo-admin *::after { transition-duration: 0s !important; animation-duration: .01s !important; animation-iteration-count: 1 !important; }
+}

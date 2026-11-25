@@ -1,0 +1,10 @@
+# Generate independent cryptographic values. These placeholders disable affected endpoints.
+ADMIN_TOTP_KEY=""
+ADMIN_PASSWORD_KEY=""
+RATE_LIMIT_KEY=""
+TURNSTILE_SECRET=""
+TURNSTILE_SITE_KEY=""
+TURNSTILE_HOSTNAMES="localhost,127.0.0.1"
+TELEGRAM_BOT_TOKEN=""
+TELEGRAM_CHAT_ID=""
+TELEGRAM_STORE="lumo"
