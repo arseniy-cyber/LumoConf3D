@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
 
 test('loads all nine slots, price, and the WebGL fallback', async ({ page }) => {
   await page.goto('/')
@@ -82,7 +83,13 @@ test('provides reference performance and distinguishes demo pricing', async ({ p
   await expect(page.getByRole('link', { name: 'Опубликованный тест' }).first()).toHaveAttribute('href', /techspot/)
   await page.getByRole('button', { name: 'К итогам сборки' }).click()
   await expect(page.getByText(/демонстрационные цены и остатки/)).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Печать / PDF' })).toBeVisible()
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Скачать PDF' }).click()
+  const pdf = await download
+  expect(pdf.suggestedFilename()).toBe('lumo-build.pdf')
+  const bytes = await readFile((await pdf.path())!)
+  expect(bytes.subarray(0, 4).toString()).toBe('%PDF')
+  expect(bytes.length).toBeGreaterThan(5_000)
 })
 
 test('exports a part list and opens a portable sharing link', async ({ page, context }) => {
@@ -90,11 +97,13 @@ test('exports a part list and opens a portable sharing link', async ({ page, con
   const download = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Экспорт', exact: true }).click()
   expect((await download).suggestedFilename()).toBe('lumo-build.txt')
+  await page.getByRole('combobox', { name: 'Окружение сцены' }).selectOption('technical')
   await page.getByRole('button', { name: 'Ссылка на сборку' }).click()
   const url = await page.getByRole('textbox', { name: 'Ссылка на сборку' }).inputValue()
   const other = await context.newPage()
   await other.goto(url)
   await expect(other.locator('.part-count')).toHaveText('9/9')
+  await expect(other.getByRole('combobox', { name: 'Окружение сцены' })).toHaveValue('technical')
 })
 
 test('filters presets by budget and supports an empty assembly', async ({ page }) => {

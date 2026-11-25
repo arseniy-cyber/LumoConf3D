@@ -75,7 +75,7 @@ test('LUMO API on workerd and a fresh D1 database', async t => {
   }))
   t.after(() => emulator.dispose())
   const db = await emulator.getD1Database('DB')
-  for (const file of ['0001_initial.sql', '0002_catalog.sql']) {
+  for (const file of ['0001_initial.sql', '0002_catalog.sql', '0003_catalog_assets.sql']) {
     const sql = await readFile(new URL(`../migrations/${file}`, import.meta.url), 'utf8')
     await db.batch(statements(sql).map(statement => db.prepare(statement)))
   }
@@ -123,6 +123,11 @@ test('LUMO API on workerd and a fresh D1 database', async t => {
     assert.ok(result.headers.get('strict-transport-security'))
     assert.equal(result.payload.products.length, 58)
     assert.equal(result.payload.nextOffset, null)
+    for (const seeded of result.payload.products) {
+      const local = catalog.find(item => item.id === seeded.id)
+      assert.equal(seeded.modelUrl, local?.modelUrl)
+      assert.equal(seeded.image, local?.image)
+    }
     assert.equal((await request('/api/catalog?category=gpu')).payload.products.length, 10)
     assert.equal((await request('/api/presets')).payload.presets.length, presets.length)
     assert.equal((await request('/api/store')).payload.store.checkoutEnabled, true)

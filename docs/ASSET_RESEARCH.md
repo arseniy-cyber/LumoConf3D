@@ -9,6 +9,10 @@
 | Файл в `public/models/` | Оси и модель | Проверенные характеристики | Источники |
 | --- | --- | --- | --- |
 | `nzxt-h5-flow-2024.glb` | NZXT H5 Flow, CC-H52FB-01, 225 × 465 × 430 мм | Габарит, компоновка, стекло, перфорация, отдельные фронтальная, верхняя и правая панели. Вентиляторы ставятся отдельно движком сцены | [Спецификация NZXT](https://support.nzxt.com/hc/en-us/articles/40225168535451-H5-Flow-2024-Specs), [руководство](https://cdn-g.nzxt.com/dl/1724123146-h5-flow-h5-flow-rgb-2024-digital-manual_240401_v1.pdf), [галерея](https://nzxt.com/products/h5-flow) |
+| `nzxt-h7-flow-2024.glb` | NZXT H7 Flow 2024, CM-H72FB-01, 244 × 544 × 468 мм | Вентиляция от нижней тройки вентиляторов, отдельный боковой воздухозабор блока питания и вертикальная ориентация заднего крепления, раздельные стекло, фасад, крышка и боковая стенка | [Спецификация NZXT](https://support.nzxt.com/hc/en-us/articles/40379376386203-H7-Flow-2024-Specs), [галерея NZXT](https://nzxt.com/products/h7-flow) |
+| `corsair-4000d-airflow.glb` | Corsair 4000D Airflow, CC-9011200-WW, 230 × 466 × 453 мм | Треугольная перфорация съёмного фасада, внутренний кабельный кожух, фильтр, панели и стекло | [Спецификация Corsair](https://www.corsair.com/us/en/p/pc-cases/cc-9011200-ww/4000d-airflow-tempered-glass-mid-tower-atx-case-black-cc-9011200-ww), [руководство](https://assets.corsair.com/image/upload/v1684779868/corsairmedia/sys_master/productcontent/WW_4000D_4000D_Airflow_QSG_AB.pdf), [фотография CC BY-SA 4.0](https://commons.wikimedia.org/wiki/File:Corsair_4000D_Airflow_mid-tower_ATX_case.tif) |
+| `fractal-north.glb` | Fractal Design North Charcoal Black TG Dark, FD-C-NOR1C-02, 215 × 469 × 447 мм | Отдельные ореховые планки с фильтром за ними, латунные ножки и кнопка, затенённое стекло и боковая металлическая полоса | [Паспорт Fractal North](https://assets.fractal-design.com/files/uxzbxy2o/production/23a01a08f4b1cecd7b3efda20f85d8dcee09d891.pdf) |
+| `fractal-pop-mini-air.glb` | Fractal Design Pop Mini Air RGB, FD-C-POR1M-06, 215 × 393 × 432 мм | Сетчатый фасад с нижним съёмным экраном, компактная компоновка, четыре задних слота, тонкая рамка прозрачного стекла | [Карточка Fractal](https://www.fractal-design.com/products/cases/pop-series/pop-mini-air/pop-mini-air-rgb-black-tg-clear-tint/), [паспорт](https://assets.fractal-design.com/files/uxzbxy2o/production/7bfbaea350f51ede3fb798612c886ee1571ad92b.pdf) |
 | `asus-dual-rtx4070-super-oc.glb` | ASUS DUAL-RTX4070S-O12G, 133,94 × 51,13 × 267,01 мм | Габарит, раздельные роторы двух вентиляторов, металлическая пластина, зона кабельного разъёма, кронштейн, радиатор и теплоотвод | [Спецификация ASUS](https://www.asus.com/motherboards-components/graphics-cards/dual/dual-rtx4070s-o12g/techspec/), [галерея](https://www.asus.com/motherboards-components/graphics-cards/dual/dual-rtx4070s-o12g/) |
 | `corsair-rm850e-2023.glb` | Corsair RM850e 2023, CP-9020263-NA, 150 × 86 × 140 мм | Габарит, модульные порты, вентиляция, отдельный ротор 120 мм класса | [Габариты и галерея Corsair](https://www.corsair.com/us/en/p/psu/CP-9020263-NA/rme-series-rm850e-fully-modular-low-noise-atx-power-supply-cp-9020263-na) |
 | `samsung-990-pro-2tb.glb` | Samsung 990 PRO 2 ТБ, MZ-V9P2T0BW, M.2 2280, до 2,3 × 22 × 80 мм | Габарит, кромка контактов и крепёжный вырез, контроллер, банки памяти и стилизованная маркировка | [Карточка Samsung](https://www.samsung.com/uk/memory-storage/nvme-ssd/990-pro-2tb-nvme-pcie-gen-4-mz-v9p2t0bw/), [паспорт SSD](https://download.semiconductor.samsung.com/resources/data-sheet/Samsung_NVMe_SSD_990_PRO_Datasheet_Rev.1.0_10129514049640.pdf) |
@@ -30,7 +34,7 @@
 | `nvidia-rtx4090-fe.webp` | 极客湾Geekerwan, кадр видеосъёмки | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), [кадр и исходное видео](https://commons.wikimedia.org/wiki/File:Leistungsanalyse_NVIDIA_GeForce_RTX_4090_(Geekerwan)_02_cropped.jpg) |
 | `nzxt-h5-flow-2024.webp`, `asus-dual-rtx4070-super-oc.webp` | LUMO, оригинальные визуализации | Исходники в `scripts/build_product_models.py` |
 
-Публичная копия атрибуции находится в `public/asset-credits.html`.
+Публичная копия атрибуции и дополнительные результаты поиска фотографий находятся в `public/asset-credits.html` и `docs/CATALOG_SOURCES.md`.
 
 Найдены и отложены модель обычной RTX 4070 без нужной геометрии и неподтверждённый кадр собранного ПК с ASUS Dual RTX 4070 SUPER. Материалы таких источников в сборку не вошли. У опубликованных фотографий NZXT, ASUS и других производителей право коммерческой перепубликации в проекте не подтверждено. [Sketchfab RTX 4070](https://sketchfab.com/3d-models/rtx-4070-174798ba45fc47218920d229a684bf88) · [Карточка кадра Creative Commons с отметкой о незавершённой проверке](https://commons.wikimedia.org/wiki/File:Intel_Core_i7-14700KF_–_ASUS_DUAL_RTX4070_Super_-_Phanteks_XT_View_Black_-_SUPREME_Build_-_INVADERPC.webm)
 
@@ -42,6 +46,7 @@ Blender 4.3.2 генерирует GLB по физическим координ�
 export LUMO_MODEL_OUTPUT=/tmp/lumo-raw-models
 blender -b -t 4 --python-exit-code 1 --python scripts/build_product_models.py
 blender -b -t 4 --python-exit-code 1 --python scripts/build_internal_models.py
+blender -b -t 4 --python-exit-code 1 --python scripts/build_case_models.py
 
 for model in "$LUMO_MODEL_OUTPUT"/*.glb; do
   npx --yes --package @gltf-transform/cli@4.5.1 -- gltf-transform meshopt "$model" "public/models/${model##*/}"
@@ -52,6 +57,8 @@ node --experimental-strip-types --test tests/assets.test.ts
 
 Для статичных иллюстраций добавьте `-- --render` к команде Blender. PNG сохраняются в `/tmp/lumo-model-renders`. Пакетные GLB сжаты расширением EXT_meshopt_compression. Сама геометрия доступна при декодировании без сети.
 
-14 файлов загружены через Three.js GLTFLoader с MeshoptDecoder при автоматической проверке. Измерение внешних размеров выполнено по декодированным вершинам, проверены имена креплений, роторы и прозрачное стекло. Две визуализации основной пары отрисованы в Blender и просмотрены. Проверка посадки через WebGL и оценка подвижных деталей относятся к проверкам приложения. Пригодность к изготовлению или точность скрытых монтажных деталей следует подтверждать отдельно.
+18 перечисленных файлов загружены через Three.js GLTFLoader с MeshoptDecoder при автоматической проверке. Измерение внешних размеров выполнено по декодированным вершинам, проверены имена креплений, роторы и прозрачное стекло. Две визуализации основной пары отрисованы в Blender и просмотрены. Проверка посадки через WebGL и оценка подвижных деталей относятся к проверкам приложения. Пригодность к изготовлению или точность скрытых монтажных деталей следует подтверждать отдельно.
 
-Для остальных позиций требуется добавить и проверить фотографии и продуктовые GLB. Подмена фотографий и моделей лицензиями из результата поиска без проверки страницы оригинала недопустима.
+Локальными GLB обеспечены все позиции каталога. Для дополнительных фотографий продолжается подбор источников с подходящими правами. Найденный на Sketchfab RTX 4090 Founders Edition от GIHYEON опубликован с CC BY. Его официальный endpoint загрузки вернул 401 без учётных данных. Файл не входил в проект. [Карточка модели](https://sketchfab.com/3d-models/rtx-4090-founders-edition-463a9f8002694aa0ac2324637eacc8d3)
+
+Полный статический комплект включает 58 GLB и по одному изображению на товар. Для восстановления всех семейств запустите генераторы `scripts/build_*.py`, затем те же команды Meshopt. Источники характеристик и типы изображений приведены в [сводном реестре](../ASSETS.md). Публичная атрибуция содержит 12 лицензированных фото или кадров и 46 подписанных визуализаций. [Атрибуция](../public/asset-credits.html)

@@ -30,6 +30,7 @@ export const categoryOrder: Category[] = ['case', 'cpu', 'gpu', 'motherboard', '
 export const defaultScene: SceneOptions = {
   mode: 'studio',
   quality: 'auto',
+  lightTemperature: 6500,
   powered: true,
   glass: true,
   exploded: 0,
@@ -82,20 +83,79 @@ export function parseBuild(value: unknown): Build {
   }))
 }
 
+export function parseSceneOptions(value: unknown): SceneOptions {
+  if (!value || typeof value !== 'object') return defaultScene
+  const input = value as Record<string, unknown>
+  const flag = (key: 'powered' | 'glass' | 'airflow' | 'rgbSync' | 'animations' | 'separatedGlass') =>
+    typeof input[key] === 'boolean' ? input[key] : defaultScene[key]
+  const fraction = (key: 'exploded' | 'airflowSpeed' | 'rgbBrightness' | 'rgbSpeed' | 'animationSpeed', min = 0, max = 1) => {
+    const current = input[key]
+    return typeof current === 'number' && Number.isFinite(current) ? Math.max(min, Math.min(max, current)) : defaultScene[key]
+  }
+  const direction = input.airflowDirection === 'exhaust' ? 'exhaust' : 'intake'
+  const mount = ['front', 'top', 'rear', 'bottom', 'side'] as const
+  const sceneMode = ['studio', 'light', 'gaming', 'technical'] as const
+  const effects = ['static', 'breathing', 'wave', 'rainbow', 'sequence', 'transition', 'custom'] as const
+  const qualities = ['auto', 'low', 'high'] as const
+  const color = (candidate: unknown) => typeof candidate === 'string' && /^#[\da-f]{6}$/i.test(candidate) ? candidate : undefined
+  function colors<K extends string>(value: unknown, keys: readonly K[]): Partial<Record<K, string>> {
+    if (!value || typeof value !== 'object') return {}
+    const record = value as Record<string, unknown>
+    return Object.fromEntries(keys.flatMap(key => {
+      const shade = color(record[key])
+      return shade ? [[key, shade]] : []
+    })) as Partial<Record<K, string>>
+  }
+  return {
+    powered: flag('powered') ?? defaultScene.powered,
+    glass: flag('glass') ?? defaultScene.glass,
+    airflow: flag('airflow') ?? defaultScene.airflow,
+    rgbSync: flag('rgbSync') ?? defaultScene.rgbSync,
+    animations: flag('animations') ?? defaultScene.animations,
+    separatedGlass: flag('separatedGlass'),
+    exploded: fraction('exploded'),
+    airflowSpeed: fraction('airflowSpeed'),
+    rgbBrightness: fraction('rgbBrightness'),
+    rgbSpeed: fraction('rgbSpeed'),
+    animationSpeed: fraction('animationSpeed', .5, 2),
+    mode: sceneMode.find(key => key === input.mode) ?? defaultScene.mode,
+    quality: qualities.find(key => key === input.quality) ?? defaultScene.quality,
+    lightTemperature: typeof input.lightTemperature === 'number' && Number.isFinite(input.lightTemperature)
+      ? Math.min(9000, Math.max(3000, input.lightTemperature)) : defaultScene.lightTemperature,
+    rgbEffect: effects.find(key => key === input.rgbEffect) ?? defaultScene.rgbEffect,
+    fanLocation: mount.find(key => key === input.fanLocation) ?? defaultScene.fanLocation,
+    rgbColor: color(input.rgbColor) ?? defaultScene.rgbColor,
+    rgbZones: colors(input.rgbZones, categories),
+    fanColors: colors(input.fanColors, mount),
+    airflowDirection: direction,
+    explodedCategory: categories.find(key => key === input.explodedCategory),
+    hiddenCategories: categories.filter(key => Array.isArray(input.hiddenCategories) && input.hiddenCategories.includes(key)),
+    finish: typeof input.finish === 'string' && input.finish.length < 48 ? input.finish : undefined,
+  }
+}
+
+export function sharedSceneOptions() {
+  const data = new URLSearchParams(location.search).get('scene')
+  if (data && data.length <= 2048) {
+    try { return parseSceneOptions(JSON.parse(data)) } catch { /* Ignore malformed share options. */ }
+  }
+  return undefined
+}
+
 export function recoverBuild(fallback: Build, key: string): BuilderState {
   const params = new URLSearchParams(location.search)
   try {
     const shared = params.get('build')
-    if (shared) {
+    if (shared && shared.length <= 2048) {
       const build = parseBuild(JSON.parse(shared))
-      if (Object.keys(build).length) return { build, name: 'Полученная сборка', options: defaultScene }
+      if (Object.keys(build).length) return { build, name: 'Полученная сборка', options: sharedSceneOptions() ?? defaultScene }
     }
   } catch { /* Ignore invalid share links. */ }
   const saved = readStorage<Partial<BuilderState> | null>(key, null)
   return {
     build: saved?.build ? parseBuild(saved.build) : fallback,
     name: typeof saved?.name === 'string' ? saved.name : 'Сборка LUMO',
-    options: { ...defaultScene, ...saved?.options },
+    options: parseSceneOptions(saved?.options),
   }
 }
 
@@ -129,9 +189,17 @@ export function partCaption(part: Part): string {
   }
 }
 
-export function shareUrl(build: Build) {
+export function shareUrl(build: Build, scene: SceneOptions) {
   const url = new URL(location.href)
   url.searchParams.delete('shared')
   url.searchParams.set('build', JSON.stringify(build))
+  const options = {
+    mode: scene.mode, lightTemperature: scene.lightTemperature, powered: scene.powered, glass: scene.glass, separatedGlass: scene.separatedGlass,
+    exploded: scene.exploded, explodedCategory: scene.explodedCategory, hiddenCategories: scene.hiddenCategories,
+    finish: scene.finish, fanLocation: scene.fanLocation, fanColors: scene.fanColors, rgbColor: scene.rgbColor,
+    rgbBrightness: scene.rgbBrightness, rgbSpeed: scene.rgbSpeed, rgbZones: scene.rgbZones, rgbSync: scene.rgbSync,
+    rgbEffect: scene.rgbEffect, airflow: scene.airflow, airflowSpeed: scene.airflowSpeed, airflowDirection: scene.airflowDirection,
+  }
+  url.searchParams.set('scene', JSON.stringify(options))
   return url.toString()
 }

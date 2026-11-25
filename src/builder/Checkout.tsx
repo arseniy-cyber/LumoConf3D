@@ -23,14 +23,22 @@ export function Checkout({ store, build, parts, blocked, total, fanLocation, clo
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [order, setOrder] = useState<{ id: string; total: number; currency: string }>()
-  const [quote, setQuote] = useState<number>()
+  type Quote = { total: number; discount: number; parts: Pick<Part, 'id' | 'price' | 'priceStatus'>[]; services: Store['services'] }
+  const [quote, setQuote] = useState<Quote>()
+  const [exporting, setExporting] = useState(false)
   const challenge = useRef<HTMLDivElement>(null)
   const widget = useRef<string>('')
   const orderAttempt = useRef<{ payload: string; key: string }>(undefined)
+  const quoteRevision = useRef(0)
   const availableServices = store.assemblyFee > 0
     ? [{ id: 'assembly', name: 'Услуга сборки', price: store.assemblyFee }, ...store.services]
     : store.services
-  const displayedTotal = quote ?? total + availableServices.filter(service => services.includes(service.id)).reduce((sum, service) => sum + service.price, 0)
+  const pricedParts = parts.map(part => {
+    const authoritative = quote?.parts.find(item => item.id === part.id)
+    return authoritative ? { ...part, ...authoritative } : part
+  })
+  const selectedServices = quote?.services ?? availableServices.filter(service => services.includes(service.id))
+  const displayedTotal = quote?.total ?? total + selectedServices.reduce((sum, service) => sum + service.price, 0)
   const options = { fanLocation }
 
   useEffect(() => {
@@ -72,13 +80,37 @@ export function Checkout({ store, build, parts, blocked, total, fanLocation, clo
   }, [store.turnstileSiteKey, store.checkoutEnabled, blocked])
 
   async function requestQuote() {
+    const revision = ++quoteRevision.current
     setError('')
     try {
-      const result = await api<{ pricing: { total: number } }>('/quote', { parts: build, services, promoCode, options })
-      setQuote(result.pricing.total)
+      const result = await api<{ pricing: Quote }>('/quote', { parts: build, services, promoCode, options })
+      if (revision === quoteRevision.current) setQuote(result.pricing)
     } catch (failure) {
+      if (revision !== quoteRevision.current) return
       setError((failure as Error).message)
       setQuote(undefined)
+    }
+  }
+
+  async function exportPdf() {
+    setExporting(true)
+    setError('')
+    try {
+      const { createBuildPdf } = await import('./pdf')
+      const pdf = await createBuildPdf({
+        name: 'Комплектация ПК', parts: pricedParts, currency: store.currency, total: displayedTotal,
+        services: selectedServices, discount: quote?.discount ?? 0,
+      })
+      const url = URL.createObjectURL(pdf)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'lumo-build.pdf'
+      link.click()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch {
+      setError('Не удалось подготовить PDF. Попробуйте ещё раз.')
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -119,21 +151,27 @@ export function Checkout({ store, build, parts, blocked, total, fanLocation, clo
   return <Modal title="Итоги сборки" close={close}>
     {order ? <div className="order-confirmation"><CheckCircle2 size={36} /><h3>Заявка принята</h3><p>Номер {order.id}</p><strong>{money(order.total, order.currency)}</strong></div> : <>
       <div className="order-list">
-        {parts.map(part => <div key={part.id}><span>{labels[part.category]}<strong>{part.name}</strong></span><strong>{money(part.price, store.currency)}</strong></div>)}
+        {pricedParts.map(part => <div key={part.id}><span>{labels[part.category]}<strong>{part.name}</strong></span><strong>{money(part.price, store.currency)}</strong></div>)}
+        {quote != null && quote.discount > 0 && <div><span>Скидка</span><strong>−{money(quote.discount, store.currency)}</strong></div>}
       </div>
       <div className="order-total"><span>{quote == null ? 'Стоимость комплектации' : 'Расчёт магазина'}</span><strong>{money(displayedTotal, store.currency)}</strong></div>
-      {parts.some(part => part.priceStatus === 'demo') && <p className="muted">В каталоге используются демонстрационные цены и остатки.</p>}
+      {pricedParts.some(part => part.priceStatus === 'demo') && <p className="muted">В каталоге используются демонстрационные цены и остатки.</p>}
       {blocked && <p className="notice warn"><CircleAlert size={16} /> Выберите обязательные компоненты и устраните конфликты совместимости.</p>}
       {!store.checkoutEnabled && <p className="notice"><CircleAlert size={16} /> Приём заявок магазином пока не подключён.</p>}
       {store.checkoutEnabled && !blocked && <form className="order-form" onSubmit={submit}>
         {availableServices.map(service => <label className="setting-toggle" key={service.id}>
           <span>{service.name} · {money(service.price, store.currency)}</span>
           <input type="checkbox" checked={services.includes(service.id)} onChange={event => {
+            quoteRevision.current++
             setQuote(undefined)
             setServices(current => event.target.checked ? [...current, service.id] : current.filter(id => id !== service.id))
           }} />
         </label>)}
-        <div className="promo-field"><input type="text" aria-label="Промокод" placeholder="Промокод" maxLength={32} value={promoCode} onChange={event => { setPromoCode(event.target.value); setQuote(undefined) }} />
+        <div className="promo-field"><input type="text" aria-label="Промокод" placeholder="Промокод" maxLength={32} value={promoCode} onChange={event => {
+          quoteRevision.current++
+          setPromoCode(event.target.value)
+          setQuote(undefined)
+        }} />
           <button type="button" className="button compact" onClick={requestQuote}>Пересчитать</button></div>
         <label>Имя<input name="name" autoComplete="name" required minLength={2} maxLength={100} /></label>
         <label>Электронная почта<input name="email" type="email" autoComplete="email" maxLength={200} /></label>
@@ -143,7 +181,7 @@ export function Checkout({ store, build, parts, blocked, total, fanLocation, clo
         <button className="button primary" type="submit" disabled={!token || busy}>{busy ? 'Отправка…' : 'Оставить заявку'}<ArrowRight size={16} /></button>
       </form>}
       {error && <p className="notice danger" role="alert"><CircleAlert size={16} /> {error}</p>}
-      <div className="modal-actions"><button className="button" onClick={() => window.print()}><FileDown size={16} /> Печать / PDF</button></div>
+      <div className="modal-actions"><button className="button" disabled={exporting} onClick={exportPdf}><FileDown size={16} /> {exporting ? 'Подготовка PDF…' : 'Скачать PDF'}</button></div>
     </>}
   </Modal>
 }

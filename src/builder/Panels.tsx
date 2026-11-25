@@ -110,6 +110,9 @@ export function SettingsPanel({ panel, options, parts, change }: {
     <label className="setting"><strong>Качество графики</strong><select value={options.quality} onChange={event => change({ quality: event.target.value as SceneOptions['quality'] })}>
       <option value="auto">Автоматически</option><option value="low">Облегчённое</option><option value="high">Максимальное</option>
     </select></label>
+    <label className="setting"><strong>Температура света <span>{options.lightTemperature ?? 6500} K</span></strong>
+      <input type="range" min={3000} max={9000} step={100} value={options.lightTemperature ?? 6500}
+        onChange={event => change({ lightTemperature: event.target.valueAsNumber })} /></label>
     {chassis && chassis.colors.length > 1 && <label className="setting"><strong>Цвет корпуса в сцене</strong><select
       value={chassis.colors.includes(options.finish ?? '') ? options.finish : chassis.colors[0]}
       onChange={event => change({ finish: event.target.value })}>

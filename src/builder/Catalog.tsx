@@ -28,6 +28,7 @@ export function Modal({ title, caption, children, close, wide = false }: {
 
 const keys: Record<string, string> = {
   socket: 'Сокет', sockets: 'Поддерживаемые сокеты', formFactor: 'Форм-фактор', formFactors: 'Форматы плат',
+  widthMm: 'Ширина платы, мм', heightMm: 'Высота платы, мм',
   memoryType: 'Тип памяти', memorySlots: 'Слоты памяти', memoryModules: 'Модули в комплекте', capacityGb: 'Объём, ГБ',
   speedMts: 'Скорость, МТ/с', chipset: 'Чипсет', cores: 'Ядра', threads: 'Потоки', vramGb: 'Видеопамять, ГБ',
   gpuSlots: 'Слоты расширения', gpuClearanceMm: 'Длина видеокарты до, мм', coolerClearanceMm: 'Высота кулера до, мм',
@@ -55,7 +56,7 @@ export function PartDetails({ part }: { part: Part }) {
     <div className="detail-picture">
       {part.image ? <img src={part.image} alt={part.name} /> : <PartIcon part={part} size={46} />}
       <span>{part.image ? (part.specs.imageKind === 'render' ? 'Авторская 3D-визуализация' : 'Изображение товара') : 'Фотография пока недоступна'}</span>
-      {part.image && <a className="source-link" href="/asset-credits.html" target="_blank" rel="noreferrer">Авторы изображений <ExternalLink size={12} /></a>}
+      {part.image?.startsWith('/images/parts/') && <a className="source-link" href={`/asset-credits.html#${encodeURIComponent(part.id)}`} target="_blank" rel="noreferrer">Авторы изображений <ExternalLink size={12} /></a>}
     </div>
     <div>
       <p className="muted">{part.brand} · {part.model}</p>

@@ -144,7 +144,7 @@ export function badge(label: string, tone: 'purple' | 'green' | 'orange' | 'gray
 
 export function money(value: number, currency = 'RUB'): string {
   try {
-    return new Intl.NumberFormat('ru-RU', { style: 'currency', currency, maximumFractionDigits: 2 }).format(value)
+    return new Intl.NumberFormat('ru-RU', { style: 'currency', currency, minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value)
   } catch {
     return `${value.toLocaleString('ru-RU')} ${currency}`
   }

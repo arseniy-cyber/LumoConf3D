@@ -4,7 +4,7 @@ const checkedAt = '2026-11-26'
 const standardBoards: FormFactor[] = ['ATX', 'Micro-ATX', 'Mini-ITX']
 const atxPowerSupplies: Specs['psuFormFactors'] = ['ATX']
 
-function dimensions(width: number, height: number, depth: number): Part['dimensions'] {
+function dimensions(width: number, height: number, depth: number): NonNullable<Part['dimensions']> {
   return { width, height, depth }
 }
 
@@ -280,32 +280,34 @@ const motherboards: Part[] = [
 
 function memory(
   id: string, brand: string, name: string, model: string, price: number, source: string,
-  memoryType: MemoryType, capacityGb: number, speedMts: number, latencyCl: number, moduleHeightMm: number, rgb = false,
+  memoryType: MemoryType, capacityGb: number, speedMts: number, latencyCl: number, size: NonNullable<Part['dimensions']>,
+  rgb = false, lowProfile?: boolean,
 ): Part {
   return part('ram', id, brand, name, model, price, source, {
-    memoryType, capacityGb, speedMts, latencyCl, memoryModules: 2, moduleHeightMm, rgb, form: 'UDIMM',
-    lowProfile: id.startsWith('corsair-vengeance-lpx-') || id === 'corsair-vengeance-ddr5-32-6000' ? true : undefined,
+    memoryType, capacityGb, speedMts, latencyCl, memoryModules: 2, moduleHeightMm: size.height, rgb, form: 'UDIMM',
+    lowProfile, dimensionsSource: brand === 'Corsair'
+      ? 'https://help.corsair.com/hc/en-us/articles/34381966388881-RAM-Memory-Module-Dimensions' : source,
     profileNote: 'Заявленная скорость достигается при соответствующем профиле памяти и поддержке платы и процессора.',
-  })
+  }, size)
 }
 
 const memoryKits: Part[] = [
   memory('corsair-vengeance-lpx-16-3200', 'Corsair', 'Corsair Vengeance LPX 16 ГБ DDR4-3200', 'CMK16GX4M2B3200C16', 3990,
     'https://www.corsair.com/us/en/p/memory/cmk16gx4m2b3200c16/vengeancea-lpx-16gb-2-x-8gb-ddr4-dram-3200mhz-c16-memory-kit-black-cmk16gx4m2b3200c16',
-    'DDR4', 16, 3200, 16, 34),
+    'DDR4', 16, 3200, 16, dimensions(135, 33.53, 6.64), false, true),
   memory('corsair-vengeance-lpx-32-3600', 'Corsair', 'Corsair Vengeance LPX 32 ГБ DDR4-3600', 'CMK32GX4M2D3600C18', 6990,
     'https://www.corsair.com/us/en/p/memory/cmk32gx4m2d3600c18/vengeancea-lpx-32gb-2-x-16gb-ddr4-dram-3600mhz-c18-memory-kit-black-cmk32gx4m2d3600c18',
-    'DDR4', 32, 3600, 18, 34),
+    'DDR4', 32, 3600, 18, dimensions(135, 33.53, 6.64), false, true),
   memory('kingston-fury-beast-ddr4-32-3200', 'Kingston', 'Kingston FURY Beast 32 ГБ DDR4-3200', 'KF432C16BBK2/32', 6490,
-    'https://www.kingston.com/datasheets/KF432C16BBK2_32.pdf', 'DDR4', 32, 3200, 16, 34),
+    'https://www.kingston.com/datasheets/KF432C16BBK2_32.pdf', 'DDR4', 32, 3200, 16, dimensions(133.35, 34, 7.2)),
   memory('corsair-vengeance-ddr5-32-6000', 'Corsair', 'Corsair Vengeance 32 ГБ DDR5-6000', 'CMK32GX5M2B6000Z30', 10490,
     'https://www.corsair.com/us/en/p/memory/cmk32gx5m2b6000z30/vengeance-32gb-2x16gb-ddr5-dram-6000mt-s-cl30-amd-expo-intel-xmp-memory-kit-cmk32gx5m2b6000z30',
-    'DDR5', 32, 6000, 30, 35),
+    'DDR5', 32, 6000, 30, dimensions(135, 35, 7), false, true),
   memory('corsair-vengeance-rgb-ddr5-32-6000', 'Corsair', 'Corsair Vengeance RGB 32 ГБ DDR5-6000', 'CMH32GX5M2B6000Z30K', 12990,
     'https://www.corsair.com/us/en/p/memory/cmh32gx5m2b6000z30k/vengeance-rgb-32gb-2x16gb-ddr5-dram-6000mt-s-cl30-amd-expo-intel-xmp-memory-kit-cmh32gx5m2b6000z30k',
-    'DDR5', 32, 6000, 30, 44, true),
+    'DDR5', 32, 6000, 30, dimensions(135, 44, 8), true),
   memory('kingston-fury-beast-ddr5-64-6000', 'Kingston', 'Kingston FURY Beast 64 ГБ DDR5-6000', 'KF560C36BBEK2-64', 20990,
-    'https://www.kingston.com/datasheets/KF560C36BBEK2-64.pdf', 'DDR5', 64, 6000, 36, 34.9),
+    'https://www.kingston.com/datasheets/KF560C36BBEK2-64.pdf', 'DDR5', 64, 6000, 36, dimensions(133.35, 34.9, 6.62)),
 ]
 
 const commonCoolerSockets: Socket[] = ['AM4', 'AM5', 'LGA1700']
@@ -319,7 +321,7 @@ const coolers: Part[] = [
   part('cooler', 'thermalright-peerless-assassin-120-se', 'Thermalright', 'Thermalright Peerless Assassin 120 SE', 'PA120 SE', 5290,
     'https://www.thermalright.com/product/peerless-assassin-120-se/',
     { sockets: commonCoolerSockets, coolerHeightMm: 155, fanSizeMm: 120, fanCount: 2, maxRpm: 1550, rgb: false,
-      coolingType: 'Воздушное', sizeNotes: 'Размер радиатора без вентиляторов.' }, dimensions(125, 155, 110)),
+      coolingType: 'Воздушное', sceneDepthMm: 135, sizeNotes: 'Размер радиатора без вентиляторов.' }, dimensions(125, 155, 110)),
   part('cooler', 'noctua-nh-d15-chromax-black', 'Noctua', 'Noctua NH-D15 chromax.black', 'NH-D15 chromax.black', 12990,
     'https://www.noctua.at/en/products/nh-d15-chromax-black/specifications',
     { sockets: currentCoolerSockets, coolerHeightMm: 168, fanSizeMm: 140, fanCount: 2, maxRpm: 1500, rgb: false,
@@ -422,34 +424,29 @@ const fans: Part[] = [
     'https://www.arctic.de/en/P12-PWM-PST-A-RGB', 120, 25, 2000, true),
 ]
 
-const approximatedModels = new Set([
-  'nzxt-h5-flow-2024', 'asus-dual-rtx4070-super-oc', 'samsung-990-pro-2tb', 'corsair-rm850e-2023',
-  'intel-core-i5-12400f', 'intel-core-i5-13400f', 'intel-core-i5-13600k', 'intel-core-i7-14700k',
-  'amd-ryzen-5-5600', 'amd-ryzen-7-5700x', 'amd-ryzen-5-7600', 'amd-ryzen-7-7700x',
-  'amd-ryzen-7-7800x3d', 'amd-ryzen-7-9800x3d',
+const photographedParts = new Set([
+  'amd-ryzen-5-5600',
+  'amd-ryzen-5-7600',
+  'amd-ryzen-7-5700x',
+  'amd-ryzen-7-7700x',
+  'amd-ryzen-7-7800x3d',
+  'amd-ryzen-7-9800x3d',
+  'corsair-4000d-airflow',
+  'deepcool-ak400',
+  'intel-core-i5-12400f',
+  'intel-core-i5-13600k',
+  'intel-core-i7-14700k',
+  'nvidia-rtx4090-fe',
 ])
 
-const catalogImages: Readonly<Partial<Record<string, 'photograph' | 'render'>>> = {
-  'nzxt-h5-flow-2024': 'render',
-  'asus-dual-rtx4070-super-oc': 'render',
-  'amd-ryzen-5-7600': 'photograph',
-  'amd-ryzen-7-5700x': 'photograph',
-  'amd-ryzen-7-7700x': 'photograph',
-  'amd-ryzen-7-7800x3d': 'photograph',
-  'corsair-4000d-airflow': 'photograph',
-  'deepcool-ak400': 'photograph',
-  'nvidia-rtx4090-fe': 'photograph',
-}
-
 function addVisuals(item: Part): Part {
-  const imageKind = catalogImages[item.id]
-  const hasModel = approximatedModels.has(item.id)
+  const imageKind = photographedParts.has(item.id) ? 'photograph' : 'render'
   return {
     ...item,
-    image: imageKind ? `/images/parts/${item.id}.webp` : undefined,
-    specs: imageKind ? { ...item.specs, imageKind } : item.specs,
-    modelUrl: hasModel ? `/models/${item.id}.glb` : undefined,
-    modelStatus: hasModel ? 'approximation' : undefined,
+    image: `/images/parts/${item.id}.webp`,
+    specs: { ...item.specs, imageKind },
+    modelUrl: `/models/${item.id}.glb`,
+    modelStatus: 'approximation',
   }
 }
 

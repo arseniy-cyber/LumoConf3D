@@ -12,7 +12,7 @@ import { api, demoStore, getCatalog, getPresets, getStore, saveShare, storageSuf
 import { CatalogDialog, Modal, PartIcon, PresetsDialog } from './Catalog'
 import { Checkout } from './Checkout'
 import { AnalysisPanel, FallbackModel, SettingsPanel, type Panel } from './Panels'
-import { categoryOrder, defaultScene, getParts, labels, money, parseBuild, partCaption, readStorage, recoverBuild, shareUrl, writeStorage, type BuilderState, type SavedBuild } from './state'
+import { categoryOrder, defaultScene, getParts, labels, money, parseBuild, parseSceneOptions, partCaption, readStorage, recoverBuild, sharedSceneOptions, shareUrl, writeStorage, type BuilderState, type SavedBuild } from './state'
 
 type Dialog = 'catalog' | 'presets' | 'saved' | 'checkout' | 'reset' | 'conflict' | null
 interface History {
@@ -54,12 +54,14 @@ export function Builder() {
   const [selected, setSelected] = useState<Category>()
   const [ready, setReady] = useState(false)
   const [unavailable, setUnavailable] = useState(false)
+  const [modelStatus, setModelStatus] = useState<Record<string, 'loaded' | 'unavailable'>>({})
   const [sharing, setSharing] = useState(false)
   const [toast, setToast] = useState('')
   const [newName, setNewName] = useState('')
   const [extras, setExtras] = useState(false)
   const viewport = useRef<HTMLDivElement>(null)
   const mount = useRef<HTMLDivElement>(null)
+  const partList = useRef<HTMLDivElement>(null)
   const engine = useRef<SceneController>(null)
   const picked = useMemo(() => getParts(build, parts), [build, parts])
   const sum = picked.reduce((total, part) => total + part.price, 0)
@@ -122,15 +124,24 @@ export function Builder() {
   useEffect(() => {
     if (!remoteEnabled) return
     let running = true
-    getStore().then(result => { if (running) setStore(result.store) }).catch(() => {})
-    getCatalog().then(result => { if (running && Array.isArray(result.products)) setParts(result.products) }).catch(() => {})
-    getPresets().then(result => {
-      if (running && Array.isArray(result.presets)) setPresets(result.presets)
-    }).catch(() => {})
+    Promise.all([getStore(), getCatalog()]).then(([configuration, inventory]) => {
+      if (!running) return
+      setStore(configuration.store)
+      setParts(inventory.products)
+      setPresets([])
+      getPresets().then(result => {
+        if (running && Array.isArray(result.presets)) setPresets(result.presets)
+      }).catch(() => {})
+    }).catch(() => {
+      if (running && storageSuffix) setToast('Каталог магазина недоступен. Показаны демонстрационные данные.')
+    })
     const shared = new URLSearchParams(location.search).get('shared')
     if (shared && /^[\w-]{8,90}$/.test(shared)) {
       api<{ build: Build; name: string }>(`/builds/${shared}`).then(result => {
-        if (running) commit(state => ({ ...state, build: parseBuild(result.build), name: result.name || 'Полученная сборка' }))
+        if (running) commit(state => ({
+          ...state, build: parseBuild(result.build), name: result.name || 'Полученная сборка',
+          options: sharedSceneOptions() ?? state.options,
+        }))
       }).catch(() => { if (running) setToast('Эта ссылка на сборку недоступна.') })
     }
     return () => { running = false }
@@ -148,6 +159,7 @@ export function Builder() {
         onReady: () => { setReady(true); setUnavailable(false) },
         onFanLocationChange: fanLocation => updateOptions({ fanLocation }),
         onMountBlocked: setToast,
+        onModelStatus: (part, state) => setModelStatus(previous => ({ ...previous, [part.id]: state })),
       })
       engine.current = scene
       scene.setOptions(inputs.current.options)
@@ -165,6 +177,15 @@ export function Builder() {
     else engine.current?.setBuild(picked)
   }, [picked, preview])
   useEffect(() => { engine.current?.setOptions(options) }, [options])
+  useEffect(() => {
+    const list = partList.current
+    const item = list?.querySelector<HTMLElement>('.part-row.active')
+    if (!list || !item) return
+    const area = list.getBoundingClientRect()
+    const bounds = item.getBoundingClientRect()
+    if (bounds.bottom > area.bottom) list.scrollTop += bounds.bottom - area.bottom
+    if (bounds.top < area.top) list.scrollTop -= area.top - bounds.top
+  }, [selected, panel])
 
   function openCatalog(category?: Category, item?: Part) {
     setCatalogCategory(category)
@@ -221,11 +242,11 @@ export function Builder() {
   async function copyShare() {
     if (sharing) return
     setSharing(true)
-    let link = shareUrl(build)
+    let link = shareUrl(build, options)
     if (remoteEnabled && store !== demoStore) {
       try {
         const { id } = await saveShare(build, name)
-        const url = new URL(location.href)
+        const url = new URL(link)
         url.searchParams.delete('build')
         url.searchParams.set('shared', id)
         link = url.toString()
@@ -310,7 +331,8 @@ export function Builder() {
               {Object.entries(modes).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
             </select><ChevronDown size={14} /></label></div>
           </div>
-          <div ref={mount} className="scene-mount" data-ready={ready} />
+          <div ref={mount} className="scene-mount" data-ready={ready}
+            data-loaded-models={picked.filter(part => modelStatus[part.id] === 'loaded').length} />
           {!ready && !unavailable && <div className="scene-loading"><span className="spinner" /> Загружаем 3D-сцену</div>}
           {unavailable && <FallbackModel />}
           <div className="scene-tools" aria-label="Управление сценой">
@@ -338,7 +360,7 @@ export function Builder() {
             {panel !== 'parts' ? <button className="text-button panel-link" onClick={() => setPanel('parts')}>К сборке <ChevronRight size={14} /></button> :
               <button className="text-button panel-link" onClick={() => setPanel('analysis')}>Анализ <ChevronRight size={14} /></button>}
           </div>
-          {panel === 'parts' ? <div className="parts-list">
+          {panel === 'parts' ? <div className="parts-list" ref={partList}>
             {categoryOrder.map(category => {
               const part = picked.find(item => item.category === category)
               return <div className={selected === category ? 'part-row active' : 'part-row'} key={category}>
@@ -350,6 +372,7 @@ export function Builder() {
                 </button>
                 {selected === category && part && <div className="part-row-extra">
                   <span>{partCaption(part)}</span><button className="text-button" onClick={() => openCatalog(category, part)}>Детали</button>
+                  {!unavailable && <button className="icon-button" title="Приблизить" aria-label={`Приблизить: ${labels[category]}`} onClick={() => engine.current?.focus(category)}><Focus size={15} /></button>}
                   <button className="icon-button" aria-label={`Убрать: ${labels[category]}`} title="Убрать из сборки" onClick={() => commit(state => {
                     const next = { ...state.build }
                     delete next[category]
@@ -372,7 +395,9 @@ export function Builder() {
       <div className="workspace-footer">
         <div className="workspace-note">
           {inspected ? <><PartIcon part={inspected} size={16} /> <button className="text-button" onClick={() => openCatalog(inspected.category, inspected)}>{inspected.name}</button></> :
-            <><CircleAlert size={15} /><span>{picked.some(part => part.modelStatus !== 'reference') ? 'Часть комплектующих показана с приближённой геометрией' : 'Подбирайте детали в каталоге или выбирайте их в сцене'}</span></>}
+            <><CircleAlert size={15} /><span>{picked.some(part => modelStatus[part.id] === 'unavailable') ?
+              'Для недоступных GLB показана резервная геометрия' : picked.some(part => part.modelStatus !== 'reference') ?
+                'Геометрия комплектующих приближённая' : 'Подбирайте детали в каталоге или выбирайте их в сцене'}</span></>}
         </div>
         <div className="workspace-footer-actions">
           <button className="text-button" onClick={openSaved}><Bookmark size={15} /> Сохранить</button>
@@ -380,7 +405,7 @@ export function Builder() {
           <button className="icon-button" title="Ссылка" aria-label="Ссылка на сборку" aria-expanded={extras} onClick={() => setExtras(value => !value)}><Clipboard size={16} /></button>
         </div>
       </div>
-      {extras && <div className="share-field"><label htmlFor="share-build">Ссылка на сборку</label><input id="share-build" readOnly value={shareUrl(build)} onFocus={event => event.currentTarget.select()} /></div>}
+      {extras && <div className="share-field"><label htmlFor="share-build">Ссылка на сборку</label><input id="share-build" readOnly value={shareUrl(build, options)} onFocus={event => event.currentTarget.select()} /></div>}
     </main>
     <footer className="site-footer"><span>{store.name} PC Builder</span><a href={`/admin${location.search.startsWith('?store=') ? `?store=${encodeURIComponent(store.slug)}` : ''}`}>Панель магазина</a></footer>
 
@@ -407,7 +432,7 @@ export function Builder() {
       </form>
       {saved.length === 0 ? <p className="empty">Сохранённые сборки появятся здесь.</p> : <div className="saved-list">{saved.map(item => <div key={item.id}>
         <span><strong>{item.name}</strong><small>{Object.keys(item.build).length} комплектующих</small></span>
-        <button className="button compact" onClick={() => { commit(() => ({ build: item.build, options: { ...defaultScene, ...item.options }, name: item.name })); setDialog(null); setPreview(undefined) }}>Открыть <ArrowRight size={15} /></button>
+        <button className="button compact" onClick={() => { commit(() => ({ build: parseBuild(item.build), options: parseSceneOptions(item.options), name: item.name })); setDialog(null); setPreview(undefined) }}>Открыть <ArrowRight size={15} /></button>
         <button className="icon-button" aria-label={`Удалить сохранённую сборку: ${item.name}`} onClick={() => setSaved(current => current.filter(entry => entry.id !== item.id))}><Minus size={16} /></button>
       </div>)}</div>}
     </Modal>}

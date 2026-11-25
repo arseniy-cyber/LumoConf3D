@@ -96,7 +96,7 @@ export function catalogView(
   const list = html('div')
   const { products, archivedIds } = data
   const archived = new Set(archivedIds)
-  const search = textInput('product-search', '', { type: 'search', placeholder: 'Название, бренд или артикул' })
+  const search = textInput('product-search', '', { type: 'search', placeholder: 'Найти комплектующее' })
   search.setAttribute('aria-label', 'Поиск позиции')
   const category = select('product-category', [['', 'Все категории'], ...categories.map((key) => [key, categoryNames[key]] as const)], '')
   category.setAttribute('aria-label', 'Категория комплектующего')

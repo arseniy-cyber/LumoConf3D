@@ -156,7 +156,7 @@ function mountEditor(part?: Part): {
 
 function mediaControl(api: AdminApi, type: 'model' | 'image', existing?: string): { input: HTMLInputElement; group: HTMLElement } {
   const isModel = type === 'model'
-  const input = textInput(type, existing, { placeholder: isModel ? '/models/комплектующее.glb' : '/images/комплектующее.webp', maxLength: 300 })
+  const input = textInput(`media-${type}`, existing, { placeholder: isModel ? '/models/комплектующее.glb' : '/images/комплектующее.webp', maxLength: 300 })
   const uploadResult = html('span', 'lumo-admin-muted')
   uploadResult.setAttribute('aria-live', 'polite')
   const file = html('input', 'lumo-admin-file')

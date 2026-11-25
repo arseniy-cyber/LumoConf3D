@@ -8,7 +8,7 @@ import { Airflow } from './airflow'
 import { batchDetails } from './batching'
 import {
   caseFans, chassis, chassisDimensions, cooling, graphics, memory, motherboard, mountableLocations, mountPoints,
-  powerCables, powerSupply, processor, storageDrive, type AirMount, type CaseDimensions, type ModelDetail,
+  powerCables, powerSupply, processor, storageDrive, type AirMount, type AssetMount, type CaseDimensions, type ModelDetail,
 } from './models'
 import { radialTexture, studioEnvironment, StudioMaterials } from './studio'
 
@@ -62,6 +62,7 @@ interface Entry {
   scatter: THREE.Vector3
   animation: number
   asset: boolean
+  assetRoots: THREE.Group[]
   removed?: boolean
   modelToken?: symbol
   assetScale?: number
@@ -101,11 +102,16 @@ function makeStub(): SceneController {
 }
 
 export function createScene(container: HTMLElement, callbacks: SceneCallbacks): SceneController {
+  const diagnostics = import.meta.env.DEV && new URLSearchParams(location.search).has('render-stats')
   const canvas = document.createElement('canvas')
   let renderer: THREE.WebGLRenderer
+  let softwareRenderer = false
   try {
     const context = canvas.getContext('webgl2', { alpha: true, antialias: true, powerPreference: 'high-performance' })
     if (!context) throw new Error('WebGL 2 is unavailable')
+    const driverInfo = context.getExtension('WEBGL_debug_renderer_info')
+    const driverName = driverInfo ? context.getParameter(driverInfo.UNMASKED_RENDERER_WEBGL) : context.getParameter(context.RENDERER)
+    softwareRenderer = /swiftshader|llvmpipe|softpipe|software/i.test(String(driverName))
     renderer = new THREE.WebGLRenderer({ canvas, context, antialias: true, alpha: true, powerPreference: 'high-performance' })
   } catch {
     callbacks.onUnavailable?.('3D-сцена недоступна. Подбор комплектующих открыт в облегчённом режиме.')
@@ -115,10 +121,11 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = 1.34
   renderer.setClearColor(0x11121a, 0)
+  renderer.shadowMap.type = THREE.PCFShadowMap
   canvas.className = 'builder-3d-canvas'
   canvas.style.cssText = 'display:block;width:100%;height:100%;outline-offset:-4px'
   canvas.tabIndex = 0
-  canvas.setAttribute('aria-label', 'Интерактивная 3D-модель. Стрелки вращают камеру, плюс и минус меняют масштаб, Home возвращает исходный ракурс.')
+  canvas.setAttribute('aria-label', 'Интерактивная 3D-модель. Стрелки вращают камеру, Shift со стрелками перемещает камеру, плюс и минус меняют масштаб, Home возвращает исходный ракурс.')
   container.replaceChildren(canvas)
   const scene = new THREE.Scene()
   const camera = new THREE.PerspectiveCamera(33, 1, .06, 95)
@@ -145,6 +152,12 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
   const hemi = new THREE.HemisphereLight(0xd2deff, 0x605375, 1.29)
   const key = new THREE.DirectionalLight(0xe9edff, 3.05)
   key.position.set(-5.8, 7.9, 4.1)
+  key.shadow.camera.left = key.shadow.camera.bottom = -6
+  key.shadow.camera.right = key.shadow.camera.top = 6
+  key.shadow.camera.far = 23
+  key.shadow.mapSize.set(1024, 1024)
+  key.shadow.normalBias = .018
+  key.shadow.radius = 2
   const fill = new THREE.DirectionalLight(0xd9d0ff, 1.03)
   fill.position.set(3.1, 5.9, -5.3)
   const interiorLight = new THREE.PointLight(0xb8aaff, 2.2, 8.2, 1.3)
@@ -168,6 +181,15 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
   shadow.position.set(0, -.008, 0)
   shadow.renderOrder = -1
   scene.add(shadow)
+  const shadowCatcher = new THREE.Mesh(new THREE.PlaneGeometry(26, 26), new THREE.ShadowMaterial({
+    opacity: .18, depthWrite: false,
+  }))
+  shadowCatcher.rotateX(-Math.PI / 2)
+  shadowCatcher.position.y = -.014
+  shadowCatcher.receiveShadow = true
+  shadowCatcher.visible = false
+  shadowCatcher.renderOrder = -2
+  scene.add(shadowCatcher)
   const grid = new THREE.GridHelper(36, 44, 0x67748a, 0x3a4357)
   grid.position.y = -.012
   grid.material.transparent = true
@@ -205,11 +227,18 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
   let cameraMove: CameraMove | undefined
   let power = 0
   let cableIntro = 1
-  let autoDensity = mobile.matches ? 1 : 1.55
+  let autoDensity = softwareRenderer ? .67 : mobile.matches ? 1 : 1.55
   let slowFrames = 0
   let interrupted = false
+  let statsAt = 0
+  let statsFrames = 0
 
   const animated = () => settings.animations && !reducedMotion.matches
+
+  function invalidate() {
+    if (!raf && !disposed && !paused && !contextLost) raf = requestAnimationFrame(draw)
+  }
+
   const fitDistance = () => {
     const tangent = Math.tan(THREE.MathUtils.degToRad(camera.fov * .5))
     const height = dimensions.height / (2 * tangent * .67)
@@ -227,6 +256,7 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
       cameraMove = undefined
       controls.update()
     } else cameraMove = { target, eye }
+    invalidate()
   }
 
   function resetCamera(instant = !animated()) {
@@ -273,8 +303,12 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
       technical: [0xe8eef4, 0xb0bed4, 2.65, 1.74, 1.22],
     }[mode]
     const [main, secondary, intensity, ambient, exposure] = palette
-    key.color.setHex(main)
-    fill.color.setHex(secondary)
+    const temperature = settings.lightTemperature ?? 6500
+    const tint = temperature < 6500 ? 0xffb276 : 0xa7c8ff
+    const tintAmount = Math.min(.56, Math.abs(temperature - 6500) / 5400)
+    const whitePoint = new THREE.Color(tint)
+    key.color.setHex(main).lerp(whitePoint, tintAmount)
+    fill.color.setHex(secondary).lerp(whitePoint, tintAmount * .55)
     key.intensity = intensity
     hemi.intensity = ambient
     renderer.toneMappingExposure = exposure
@@ -283,6 +317,26 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
     else if (mode === 'technical') renderer.setClearColor(0x1d2532, 1)
     else renderer.setClearColor(0x11121a, 0)
     container.dataset.sceneMode = mode
+  }
+
+  function setShadowSurfaces(root: THREE.Object3D) {
+    if (!renderer.shadowMap.enabled) return
+    root.traverse((object) => {
+      if (!(object instanceof THREE.Mesh) || Array.isArray(object.material)) return
+      if (!object.material.transparent && !object.material.alphaTest && object.renderOrder === 0) {
+        object.castShadow = true
+        object.receiveShadow = true
+      }
+    })
+  }
+
+  function setQuality() {
+    const high = settings.quality === 'high'
+    key.castShadow = high
+    renderer.shadowMap.enabled = high
+    shadowCatcher.visible = high && !detailed && Boolean(byCategory('case'))
+    if (high) for (const entry of live.values()) setShadowSurfaces(entry.detail.root)
+    resize()
   }
 
   function pixelRatio() {
@@ -300,6 +354,7 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
     camera.aspect = width / height
     camera.updateProjectionMatrix()
     if (fitting && movie < 0) resetCamera(true)
+    invalidate()
   }
 
   function allowedAsset(part: Part) {
@@ -311,9 +366,130 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
     } catch { return }
   }
 
+  function normalizeModel(model: THREE.Object3D, center: THREE.Vector3, scale: number) {
+    const inner = new THREE.Group()
+    inner.scale.setScalar(scale)
+    inner.position.copy(center).multiplyScalar(-scale)
+    inner.add(model)
+    return inner
+  }
+
+  function collectModelControls(
+    entry: Entry,
+    model: THREE.Object3D,
+    fanLocation?: MountLocation,
+    cloneLights = false,
+  ) {
+    const finishes = new Set<THREE.MeshStandardMaterial>()
+    const processed = new Set<THREE.Material>()
+    const ownRgb = new Map<THREE.MeshStandardMaterial, THREE.MeshStandardMaterial>()
+    const isCase = entry.part.category === 'case'
+    const rgbMaterial = /case-power-button|status led|rgb[- _]?(zone|emitter)/i
+    model.traverse((object) => {
+      if (/^rotor-\d+$/.test(object.name)) {
+        const axis = validAxis(object.userData.axis) ?? (entry.part.category === 'fan' ? 'z' : 'y')
+        entry.detail.rotors.push({ node: object, axis, location: fanLocation })
+      }
+      if (!(object instanceof THREE.Mesh)) return
+      const prepareMaterial = (original: THREE.Material) => {
+        let material = original
+        if (cloneLights && original instanceof THREE.MeshStandardMaterial && rgbMaterial.test(original.name)) {
+          let independent = ownRgb.get(original)
+          if (!independent) {
+            independent = original.clone()
+            ownRgb.set(original, independent)
+          }
+          material = independent
+        }
+        return material
+      }
+      const isMultiMaterial = Array.isArray(object.material)
+      const materials = (isMultiMaterial ? object.material : [object.material]).map(prepareMaterial)
+      object.material = isMultiMaterial ? materials : materials[0]
+      for (const material of materials) {
+        if (material.transparent && isCase) object.renderOrder = 7
+        if (processed.has(material)) continue
+        processed.add(material)
+        if (material.transparent) {
+          material.depthWrite = false
+          if (isCase) {
+            material.opacity *= .40
+            material.forceSinglePass = true
+          }
+        }
+        if (!(material instanceof THREE.MeshStandardMaterial)) continue
+        if (isCase && /shell-coated|frame-rail|perforated|rear-steel|tray-stamped/.test(material.name)) finishes.add(material)
+        if (rgbMaterial.test(material.name) && (entry.part.specs.rgb || isCase)) {
+          material.emissiveIntensity = 0
+          entry.detail.lights.push({ material, location: fanLocation })
+        }
+      }
+    })
+    return finishes
+  }
+
+  function clearProceduralControls(entry: Entry) {
+    for (const light of entry.detail.lights) light.material.dispose()
+    for (const material of entry.detail.ownedMaterials ?? []) material.dispose()
+    entry.detail.ownedMaterials = []
+    entry.detail.lights = []
+    entry.detail.rotors = []
+  }
+
+  function fitAsset(bounds: THREE.Box3, desired: THREE.Vector3, ignoreDepth: boolean) {
+    const size = bounds.getSize(new THREE.Vector3())
+    if (size.lengthSq() < .000000001) return undefined
+    const scale = Math.min(ignoreDepth ? Infinity : desired.x / size.x, desired.y / size.y, desired.z / size.z)
+    return Number.isFinite(scale) && scale > 0 ? scale : undefined
+  }
+
+  function installMountedModel(entry: Entry, model: THREE.Group, mounts: AssetMount[]) {
+    model.updateMatrixWorld(true)
+    const fixtures = mounts.map((mount) => {
+      const candidate = model.getObjectByName(mount.name)
+      if (!candidate) return undefined
+      const bounds = new THREE.Box3().setFromObject(candidate)
+      const scale = fitAsset(bounds, new THREE.Vector3(...mount.size), false)
+      return scale ? { mount, candidate, bounds, scale } : undefined
+    })
+    if (fixtures.some((fixture) => !fixture)) return false
+    clearProceduralControls(entry)
+    for (const fixture of fixtures) {
+      if (!fixture) continue
+      const { mount, candidate, bounds, scale } = fixture
+      const world = candidate.matrixWorld.clone()
+      candidate.removeFromParent()
+      world.decompose(candidate.position, candidate.quaternion, candidate.scale)
+      const inner = normalizeModel(candidate, bounds.getCenter(new THREE.Vector3()), scale)
+      inner.position.add(new THREE.Vector3(...mount.center))
+      for (const child of [...mount.target.children]) disposeObjects(child)
+      collectModelControls(entry, candidate)
+      mount.target.add(inner)
+      entry.assetRoots.push(inner)
+    }
+    const holder = entry.detail.root
+    if (entry.detail.updateTubes) {
+      holder.updateWorldMatrix(true, true)
+      const ports = (component: string) => [0, 1].map((index) => {
+        const marker = holder.getObjectByName(`tube-${component}-${index}`)
+        return marker ? holder.worldToLocal(marker.getWorldPosition(new THREE.Vector3())) : undefined
+      })
+      const pumpPorts = ports('pump')
+      const radiatorPorts = ports('radiator')
+      if (pumpPorts.every((port) => port !== undefined) && radiatorPorts.every((port) => port !== undefined)) {
+        entry.detail.updateTubes(pumpPorts, radiatorPorts)
+      }
+    }
+    entry.asset = true
+    return true
+  }
+
   function downloadModel(entry: Entry) {
     const source = allowedAsset(entry.part)
-    if (!source || !entry.detail.dimensions) return
+    const modelSize = entry.detail.dimensions
+    const units = entry.detail.fanUnits
+    const mounts = entry.detail.assetMounts
+    if (!source || (!modelSize && !mounts) || (units && units.length === 0)) return
     const token = Symbol(source)
     entry.modelToken = token
     void loader.loadAsync(source).then((gltf) => {
@@ -321,67 +497,71 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
         disposeObjects(gltf.scene, true)
         return
       }
-      const bounds = new THREE.Box3().setFromObject(gltf.scene)
-      const size = bounds.getSize(new THREE.Vector3())
-      const center = bounds.getCenter(new THREE.Vector3())
-      const desired = new THREE.Vector3(...entry.detail.dimensions!)
-      const scale = Math.min(desired.x / size.x, desired.y / size.y, desired.z / size.z)
-      if (!Number.isFinite(scale) || scale <= 0 || size.lengthSq() < .000000001) {
-        disposeObjects(gltf.scene, true)
-        callbacks.onModelStatus?.(entry.part, 'unavailable')
-        return
-      }
-      const isCase = entry.part.category === 'case'
-      const chassisGlass = glassPivot(gltf.scene.getObjectByName('glass'))
-      // Keep the procedural chassis when an uploaded enclosure has no separable panel.
-      if (isCase && !chassisGlass) {
-        disposeObjects(gltf.scene, true)
-        callbacks.onModelStatus?.(entry.part, 'unavailable')
-        return
-      }
-      const inner = new THREE.Group()
-      inner.scale.setScalar(scale)
-      inner.position.copy(center).multiplyScalar(-scale)
-      if (isCase) inner.position.y += desired.y / 2
-      inner.add(gltf.scene)
-      const holder = entry.detail.root
-      for (const child of [...holder.children]) disposeObjects(child)
-      for (const light of entry.detail.lights) light.material.dispose()
-      for (const material of entry.detail.ownedMaterials ?? []) material.dispose()
-      entry.detail.ownedMaterials = []
-      entry.detail.lights = []
-      const finishes = new Set<THREE.MeshStandardMaterial>()
-      entry.detail.rotors = []
-      entry.detail.glass = chassisGlass
-      if (chassisGlass) entry.glassRest.copy(chassisGlass.position)
-      gltf.scene.traverse((object) => {
-        if (/^rotor-\d+$/.test(object.name)) entry.detail.rotors.push({ node: object, axis: 'y' })
-        if (!(object instanceof THREE.Mesh)) return
-        const materials = Array.isArray(object.material) ? object.material : [object.material]
-        for (const material of materials) {
-          if (material.transparent) {
-            material.depthWrite = false
-            if (isCase) {
-              object.renderOrder = 7
-              material.opacity *= .40
-              material.forceSinglePass = true
-            }
-          }
-          if (isCase && material instanceof THREE.MeshStandardMaterial && /shell-coated|frame-rail|perforated|rear-steel|tray-stamped/.test(material.name)) finishes.add(material)
-          if (material instanceof THREE.MeshStandardMaterial && /case-power-button|status led|rgb zone/i.test(material.name)) {
-            material.emissiveIntensity = 0
-            entry.detail.lights.push({ material })
-          }
+      if (mounts) {
+        if (!installMountedModel(entry, gltf.scene, mounts)) {
+          disposeObjects(gltf.scene, true)
+          callbacks.onModelStatus?.(entry.part, 'unavailable')
+          return
         }
-      })
-      holder.add(inner)
-      entry.finishes = [...finishes].map((material) => {
-        const luminance = .24 * material.color.r + .65 * material.color.g + .11 * material.color.b
-        return { material, base: material.color.clone(), light: mats.finish('white').color.clone().multiplyScalar(.73 + luminance * 2.63) }
-      })
+        callbacks.onModelStatus?.(entry.part, 'loaded')
+        setShadowSurfaces(entry.detail.root)
+        invalidate()
+        if (detailed && fitting) focusEntry(entry, true)
+        return
+      }
+      if (!modelSize) return
+      const bounds = new THREE.Box3().setFromObject(gltf.scene)
+      const center = bounds.getCenter(new THREE.Vector3())
+      const desired = new THREE.Vector3(...modelSize)
+      const isBoard = entry.part.category === 'motherboard'
+      const scale = fitAsset(bounds, desired, isBoard)
+      const isCase = entry.part.category === 'case'
+      const chassisGlass = isCase ? glassPivot(gltf.scene.getObjectByName('glass')) : undefined
+      // Keep the procedural chassis when an uploaded enclosure has no separable panel.
+      if (!scale || (isCase && !chassisGlass)) {
+        disposeObjects(gltf.scene, true)
+        callbacks.onModelStatus?.(entry.part, 'unavailable')
+        return
+      }
+      clearProceduralControls(entry)
+      if (units) {
+        const fans = units.map((_, index) => index === 0 ? gltf.scene : gltf.scene.clone(true))
+        units.forEach(({ root, location }, index) => {
+          for (const child of [...root.children]) disposeObjects(child)
+          const model = fans[index]
+          collectModelControls(entry, model, location, index > 0)
+          const mounted = normalizeModel(model, center, scale)
+          root.add(mounted)
+          entry.assetRoots.push(mounted)
+        })
+      } else {
+        const holder = entry.detail.root
+        for (const child of [...holder.children]) disposeObjects(child)
+        const inner = normalizeModel(gltf.scene, center, scale)
+        if (isCase) inner.position.y += desired.y / 2
+        if (isBoard) inner.position.x = .017 - bounds.max.x * scale
+        if (entry.part.category === 'cooler' && !entry.part.specs.radiatorMm) {
+          inner.position.x = -bounds.max.x * scale
+        }
+        if (entry.part.category === 'ram') {
+          inner.position.x -= desired.x * .47
+          inner.position.z += entry.part.specs.memoryModules === 2 ? .212 : Math.max(0, (desired.z - .086) / 2)
+        }
+        entry.detail.glass = chassisGlass
+        if (chassisGlass) entry.glassRest.copy(chassisGlass.position)
+        const finishes = collectModelControls(entry, gltf.scene)
+        entry.finishes = [...finishes].map((material) => {
+          const luminance = .24 * material.color.r + .65 * material.color.g + .11 * material.color.b
+          return { material, base: material.color.clone(), light: mats.finish('white').color.clone().multiplyScalar(.73 + luminance * 2.63) }
+        })
+        holder.add(inner)
+        entry.assetRoots.push(inner)
+      }
       entry.asset = true
       entry.assetScale = scale
       callbacks.onModelStatus?.(entry.part, 'loaded')
+      setShadowSurfaces(entry.detail.root)
+      invalidate()
       if (detailed && fitting) focusEntry(entry, true)
     }).catch(() => {
       if (!disposed && !entry.removed && entry.modelToken === token) callbacks.onModelStatus?.(entry.part, 'unavailable')
@@ -422,6 +602,7 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
     dimensions = chassisDimensions(casing, mainboard)
     shadow.scale.set(dimensions.width * 2.25, dimensions.depth * 1.85, 1)
     shadow.visible = !detailed && Boolean(casing)
+    shadowCatcher.visible = renderer.shadowMap.enabled && shadow.visible
     interiorLight.position.set(dimensions.left - .35, dimensions.height * .62, dimensions.front * .24)
     const partIds = new Set(parts.map((part) => part.category))
     let anyChange = false
@@ -470,7 +651,7 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
       }
       const scatter = new THREE.Vector3(...positions[category])
       const entry: Entry = {
-        detail, anchor, scatter, part, asset: false,
+        detail, anchor, scatter, part, asset: false, assetRoots: [],
         animation: animated() && !detailed ? pendingSwap ? 1.07 : .50 : 0,
         glassRest: detail.glass?.position.clone() ?? new THREE.Vector3(),
         finishes: (detail.finishMaterials ?? []).map((material) => ({
@@ -483,6 +664,7 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
       root.visible = !settings.hiddenCategories?.includes(category)
       live.set(category, entry)
       scene.add(root)
+      setShadowSurfaces(root)
       if (detail.mounts) {
         const extraOffset = offset(part)
         detail.mounts = detail.mounts.map((m) => ({ ...m, center: m.center.clone().applyQuaternion(root.quaternion).add(extraOffset), interior: m.interior.clone().applyQuaternion(root.quaternion) }))
@@ -504,6 +686,7 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
       scene.add(cables)
       updateAirflow()
     }
+    invalidate()
     if ((!initialized || dimensions.width !== before.width || dimensions.height !== before.height || dimensions.depth !== before.depth) && fitting && !detailed) {
       resetCamera(!initialized)
     }
@@ -514,7 +697,8 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
       for (const light of entry.detail.lights) light.material.dispose()
       for (const material of entry.detail.ownedMaterials ?? []) material.dispose()
     }
-    disposeObjects(entry.detail.root, entry.asset)
+    for (const root of entry.assetRoots) disposeObjects(root, true)
+    disposeObjects(entry.detail.root)
   }
 
   function setBuild(newParts: Part[]) {
@@ -538,8 +722,8 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
   function setOptions(options: SceneOptions) {
     const prior = settings
     settings = { ...defaults, ...options }
-    if (settings.mode !== mode) drawMode()
-    if (settings.quality !== prior.quality) resize()
+    if (settings.mode !== mode || settings.lightTemperature !== prior.lightTemperature) drawMode()
+    if (settings.quality !== prior.quality) setQuality()
     if (fitting && !detailed && (settings.exploded !== prior.exploded || settings.explodedCategory !== prior.explodedCategory)) resetCamera()
     const dirty = new Set<Category>()
     const fanMoved = settings.fanLocation !== prior.fanLocation || settings.airflowDirection !== prior.airflowDirection
@@ -552,6 +736,7 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
     else if (settings.airflow !== prior.airflow) updateAirflow()
     for (const [category, entry] of live) entry.detail.root.visible = !settings.hiddenCategories?.includes(category)
     if (!animated()) movie = -1
+    invalidate()
   }
 
   function showPart(part: Part) {
@@ -571,6 +756,7 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
     }
     cameraMove = undefined
     movie = 0
+    invalidate()
   }
 
   function updateRgb(entry: Entry, offset: number, delta: number) {
@@ -603,6 +789,7 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
   }
 
   function draw(timeMs: number) {
+    raf = 0
     if (disposed || paused || contextLost) {
       raf = 0
       return
@@ -646,7 +833,7 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
         cameraMove = undefined
       }
     }
-    controls.update(Math.min(elapsed, .11))
+    const cameraIsMoving = controls.update(Math.min(elapsed, .11))
 
     let lightOffset = 0
     for (const entry of live.values()) {
@@ -671,7 +858,7 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
       }
       for (const rotor of detail.rotors) {
         const speed = rotor.location && settings.airflow ? .95 + settings.airflowSpeed * 1.8 : 1.2
-        if (animated()) rotor.node.rotateOnAxis(rotor.axis === 'y' ? up : zAxis, Math.min(delta, .25) * 10 * power * speed)
+        if (animated()) rotor.node.rotateOnAxis(rotor.axis === 'x' ? xAxis : rotor.axis === 'y' ? up : zAxis, Math.min(delta, .25) * 10 * power * speed)
       }
       if (part.category === 'case') {
         const lightFinish = settings.finish !== part.colors[0] && /white|бел|silver|сереб/i.test(settings.finish ?? '')
@@ -698,6 +885,21 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
     interiorLight.color.set(settings.rgbColor).lerp(workingColor.setHex(0xc9d0f0), .32)
     airflow.tick(clockSeconds, settings.airflowSpeed * .85 + .18, animated())
     renderer.render(scene, camera)
+    if (diagnostics) {
+      if (!statsAt) statsAt = timeMs
+      statsFrames++
+      const span = timeMs - statsAt
+      if (span >= 1000) {
+        const { calls, triangles } = renderer.info.render
+        canvas.dataset.rendererStats = JSON.stringify({
+          fps: Math.round(statsFrames * 1000 / span),
+          calls, triangles, pixelRatio: Number(renderer.getPixelRatio().toFixed(2)),
+          models: [...live.values()].filter(entry => entry.asset).length,
+        })
+        statsAt = timeMs
+        statsFrames = 0
+      }
+    }
     if (!initialized) {
       initialized = true
       callbacks.onReady?.()
@@ -705,14 +907,14 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
 
     if (settings.quality === 'auto' && timeMs - lastPresented > 38) {
       slowFrames++
-      if (slowFrames > 30 && autoDensity > .8) {
-        autoDensity = Math.max(.8, autoDensity - .22)
+      if (slowFrames > 9 && autoDensity > .67) {
+        autoDensity = Math.max(.67, Math.min(.90, autoDensity - .19))
         slowFrames = 0
         renderer.setPixelRatio(pixelRatio())
       }
     } else slowFrames = Math.max(0, slowFrames - 1)
     lastPresented = timeMs
-    raf = requestAnimationFrame(draw)
+    if (animated() || cameraIsMoving) invalidate()
   }
 
   function pick(event: PointerEvent) {
@@ -822,6 +1024,13 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
     movie = -1
     cameraMove = undefined
     fitting = false
+    if (event.shiftKey && physicalKey.startsWith('Arrow')) {
+      const offset = new THREE.Vector3(theta, -phi, 0).applyQuaternion(camera.quaternion)
+      camera.position.add(offset)
+      controls.target.add(offset)
+      controls.update()
+      return
+    }
     const relative = camera.position.clone().sub(controls.target)
     const orbit = new THREE.Spherical().setFromVector3(relative)
     orbit.theta += theta
@@ -845,7 +1054,7 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
       raf = 0
       lastPresented = 0
     } else if (!paused && !raf && !contextLost && !disposed) {
-      raf = requestAnimationFrame(draw)
+      invalidate()
     }
   }
 
@@ -866,9 +1075,16 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
     }
   }
 
+  const motionPreference = () => {
+    if (!animated()) resetCamera(true)
+    invalidate()
+  }
+  reducedMotion.addEventListener('change', motionPreference)
+
   const observer = new ResizeObserver(resize)
   observer.observe(container)
   controls.addEventListener('start', controlStart)
+  controls.addEventListener('change', invalidate)
   canvas.addEventListener('pointerdown', pointerDown, true)
   canvas.addEventListener('pointerup', pointerUp, true)
   canvas.addEventListener('pointercancel', cancelDrag)
@@ -886,6 +1102,7 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
     disposed = true
     if (raf) cancelAnimationFrame(raf)
     observer.disconnect()
+    reducedMotion.removeEventListener('change', motionPreference)
     controls.dispose()
     document.removeEventListener('visibilitychange', visibility)
     canvas.removeEventListener('pointerdown', pointerDown, true)
@@ -907,6 +1124,9 @@ export function createScene(container: HTMLElement, callbacks: SceneCallbacks): 
     shadow.geometry.dispose()
     shadow.material.dispose()
     shadowTexture.dispose()
+    shadowCatcher.geometry.dispose()
+    shadowCatcher.material.dispose()
+    key.shadow.dispose()
     environment.dispose()
     renderer.dispose()
     canvas.remove()
@@ -928,6 +1148,11 @@ function glassPivot(panel: THREE.Object3D | undefined) {
   return hinge
 }
 
+function validAxis(value: unknown) {
+  return value === 'x' || value === 'y' || value === 'z' ? value : undefined
+}
+
+const xAxis = new THREE.Vector3(1, 0, 0)
 const up = new THREE.Vector3(0, 1, 0)
 const zAxis = new THREE.Vector3(0, 0, 1)
 

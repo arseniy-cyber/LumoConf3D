@@ -91,6 +91,7 @@ export type RgbEffect = 'static' | 'breathing' | 'wave' | 'rainbow' | 'sequence'
 export interface SceneOptions {
   mode: SceneMode
   quality: SceneQuality
+  lightTemperature?: number
   powered: boolean
   glass: boolean
   exploded: number

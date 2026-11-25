@@ -18,6 +18,10 @@ const packages: Record<string, [number | null, number, number]> = {
   'intel-core-i7-14700k': [null, 37.5, 45],
   'asus-dual-rtx4070-super-oc': [133.94, 51.13, 267.01],
   'nzxt-h5-flow-2024': [225, 465, 430],
+  'nzxt-h7-flow-2024': [244, 544, 468],
+  'corsair-4000d-airflow': [230, 466, 453],
+  'fractal-north': [215, 469, 447],
+  'fractal-pop-mini-air': [215, 393, 432],
   'corsair-rm850e-2023': [150, 86, 140],
   'samsung-990-pro-2tb': [2.3, 22, 80],
 }
@@ -25,6 +29,10 @@ const packages: Record<string, [number | null, number, number]> = {
 const internalNodes: Record<string, string[]> = {
   'asus-dual-rtx4070-super-oc': ['rotor-0', 'rotor-1', 'mount-pcie-slot', 'connector-12v-16pin'],
   'nzxt-h5-flow-2024': ['glass', 'front-panel', 'top-panel', 'right-panel', 'mount-rear-fan'],
+  'nzxt-h7-flow-2024': ['glass', 'front-panel', 'top-panel', 'right-panel', 'mount-rear-fan', 'mount-bottom-fan-2'],
+  'corsair-4000d-airflow': ['glass', 'front-panel', 'top-panel', 'right-panel', 'mount-rear-fan'],
+  'fractal-north': ['glass', 'front-panel', 'top-panel', 'right-panel', 'mount-rear-fan'],
+  'fractal-pop-mini-air': ['glass', 'front-panel', 'top-panel', 'right-panel', 'mount-rear-fan'],
   'corsair-rm850e-2023': ['rotor-0', 'mount-atx-psu'],
   'samsung-990-pro-2tb': ['mount-m2-edge', 'mount-m2-post'],
 }
@@ -56,7 +64,7 @@ for (const [id, expected] of Object.entries(packages)) {
       assert.ok(parsed.scene.getObjectByName(name), `named node ${name}`)
     }
 
-    if (id === 'nzxt-h5-flow-2024') {
+    if (internalNodes[id]?.includes('glass')) {
       const glass = parsed.scene.getObjectByName('glass')
       assert.ok(glass?.children.some(child => child instanceof Mesh && child.material.transparent))
     }

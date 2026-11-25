@@ -49,12 +49,15 @@ test('selected presets resolve available records and have no known hard compatib
 })
 
 test('catalog image and model URLs are local files with supported formats', () => {
+  const credits = readFileSync(new URL('../public/asset-credits.html', import.meta.url), 'utf8')
   for (const item of catalog) {
     if (item.image) {
       assert.match(item.image, /^\/images\/parts\/[a-z0-9-]+\.webp$/)
       const file = readFileSync(new URL(`../public${item.image}`, import.meta.url))
       assert.equal(file.toString('ascii', 0, 4), 'RIFF')
       assert.equal(file.toString('ascii', 8, 12), 'WEBP')
+      assert.ok(item.specs.imageKind === 'photograph' || item.specs.imageKind === 'render', item.id)
+      assert.ok(credits.includes(`id="${item.id}"`), `Missing public credit for ${item.id}`)
     }
     if (item.modelUrl) {
       assert.ok(item.modelStatus, item.id)

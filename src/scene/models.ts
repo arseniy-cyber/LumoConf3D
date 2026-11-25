@@ -18,6 +18,7 @@ export interface CaseDimensions {
   pan: number
   boardY: number
   boardZ: number
+  verticalPsu: boolean
 }
 
 export interface Rotor {
@@ -31,6 +32,13 @@ export interface ModelLights {
   location?: MountLocation
 }
 
+export interface AssetMount {
+  name: 'pump' | 'radiator'
+  target: THREE.Group
+  size: [number, number, number]
+  center: [number, number, number]
+}
+
 export interface ModelDetail {
   root: THREE.Group
   rotors: Rotor[]
@@ -38,6 +46,9 @@ export interface ModelDetail {
   glass?: THREE.Object3D
   dimensions?: [number, number, number]
   mounts?: AirMount[]
+  fanUnits?: { root: THREE.Group; location: MountLocation }[]
+  assetMounts?: AssetMount[]
+  updateTubes?: (pump: THREE.Vector3[], radiator: THREE.Vector3[]) => void
   finishMaterials?: THREE.MeshStandardMaterial[]
   ownedMaterials?: THREE.Material[]
 }
@@ -61,13 +72,14 @@ export function chassisDimensions(part?: Part, motherboard?: Part): CaseDimensio
   const metric = part?.dimensions ?? defaultCase
   const { width, height, depth } = normalizeSize(metric, defaultCase)
   const isCompact = part?.specs.formFactors?.every((factor) => factor === 'Mini-ITX')
-  const floor = Math.min(0.23, height * 0.065)
-  const pan = isCompact ? floor + 0.15 : floor + Math.min(0.76, height * 0.19)
+  const verticalPsu = part?.id === 'nzxt-h7-flow-2024'
+  const floor = verticalPsu ? .32 : Math.min(0.23, height * 0.065)
+  const pan = verticalPsu ? .55 : isCompact ? floor + 0.15 : floor + Math.min(0.76, height * 0.19)
   const board = boardSize(motherboard)
   return {
-    width, height, depth, floor, pan,
+    width, height, depth, floor, pan, verticalPsu,
     left: -width / 2,
-    tray: width / 2 - 0.24,
+    tray: width / 2 - (verticalPsu ? .36 : .24),
     top: height - 0.13,
     back: -depth / 2 + 0.085,
     front: depth / 2 - 0.095,
@@ -164,7 +176,7 @@ export function chassis(part: Part, dim: CaseDimensions, mat: StudioMaterials, f
 
   box(root, finishMaterial, [0.05, top - floor, d - 0.15], [-left - 0.036, (top + floor) / 2, 0.03], 0.022)
   box(root, mat.dark, [0.025, h - 0.93, d - 0.23], [tray, (top + floor) / 2 + 0.1, 0.0], 0.012)
-  if (!isCompact) {
+  if (!isCompact && !dim.verticalPsu) {
     box(root, finishMaterial, [0.049, pan - floor - 0.03, d - 0.13], [left + 0.06, pan / 2 + floor / 2, 0.015], 0.018)
     box(root, mat.edge, [0.015, 0.021, d - 0.16], [left + 0.035, pan + 0.007, 0.015], 0.006)
     for (const z of [back + 0.11, front - 0.1]) {
@@ -301,10 +313,12 @@ export function mountPoints(
         new THREE.Vector3(-dx, top - 0.14, back + size * (index + 0.5) + 0.15),
         new THREE.Vector3(0, -1, 0),
       )
-      if (location === 'bottom') add(
-        new THREE.Vector3(-dx, floor + 0.12, front - size * (index + 0.5) - 0.21),
-        new THREE.Vector3(0, 1, 0),
-      )
+      if (location === 'bottom') {
+        const center = dim.verticalPsu
+          ? new THREE.Vector3(-.27, .44, .03 + (1 - index) * 1.30)
+          : new THREE.Vector3(-dx, floor + .12, front - size * (index + .5) - .21)
+        add(center, new THREE.Vector3(0, 1, 0))
+      }
       if (location === 'side') add(
         new THREE.Vector3(tray - 0.15, top - size * (index + 0.5) - 0.24, front - size / 2 - 0.25),
         new THREE.Vector3(-1, 0, 0),
@@ -353,6 +367,7 @@ export function caseFans(
   const rotors: Rotor[] = []
   const lights: ModelLights[] = []
   const direction = new THREE.Vector3(0, 0, 1)
+  const fanUnits = []
   for (const mount of selected) {
     const fan = fanModule(size, mat, Boolean(part.specs.rgb), '')
     fan.root.position.copy(mount.center)
@@ -360,10 +375,11 @@ export function caseFans(
     const inward = mount.location === primary ? options.airflowDirection === 'intake' : ['front', 'bottom', 'side'].includes(mount.location)
     fan.root.quaternion.setFromUnitVectors(direction, inward ? exterior : mount.interior)
     root.add(fan.root)
+    fanUnits.push({ root: fan.root, location: mount.location })
     for (const rotor of fan.rotors) rotors.push({ ...rotor, location: mount.location })
     for (const light of fan.lights) lights.push({ ...light, location: mount.location })
   }
-  return { root, rotors, lights, mounts: selected }
+  return { root, rotors, lights, mounts: selected, fanUnits, dimensions: [size, size, (part.dimensions?.depth ?? 25) / 100] }
 }
 
 export function motherboard(part: Part, dim: CaseDimensions, mat: StudioMaterials): ModelDetail {
@@ -446,9 +462,10 @@ function socketAnchor(dim: CaseDimensions, board?: Part): [number, number, numbe
 export function processor(part: Part, dim: CaseDimensions, mat: StudioMaterials, board?: Part): ModelDetail {
   const root = new THREE.Group()
   root.position.set(...socketAnchor(dim, board))
-  const width = Math.min(.51, Math.max(.30, (part.dimensions?.width ?? 40) / 100))
-  const height = Math.min(.51, Math.max(.30, (part.dimensions?.height ?? 40) / 100))
-  const thickness = Math.max(.03, (part.dimensions?.depth ?? 4.5) / 100)
+  const lga1700 = part.specs.socket === 'LGA1700'
+  const width = Math.min(.51, Math.max(.30, (part.dimensions?.width ?? (lga1700 ? 45 : 40)) / 100))
+  const height = Math.min(.51, Math.max(.30, (part.dimensions?.height ?? (lga1700 ? 37.5 : 40)) / 100))
+  const thickness = Math.max(.03, (part.dimensions?.depth ?? (lga1700 ? 5.55 : part.specs.socket === 'AM5' ? 4.55 : 4)) / 100)
   box(root, mat.pcb, [thickness * .44, height, width], [thickness * .22, 0, 0], .008)
   box(root, mat.zinc, [thickness * .56, height * .8, width * .8], [-thickness * .28, 0, 0], .015)
   stripLabels(root, mat, part.brand.toUpperCase(), width * .56, height * .19, [-thickness * .57, 0, 0], 'side', '#5a5e67')
@@ -460,7 +477,8 @@ export function memory(part: Part, dim: CaseDimensions, mat: StudioMaterials, bo
   const boardDims = boardSize(board)
   root.position.set(dim.tray - .145, dim.boardY + boardDims.height * .2, dim.boardZ + boardDims.width * .15)
   const moduleHeight = Math.max(.99, (part.dimensions?.width ?? 133.35) / 100)
-  const stickDepth = Math.min(.56, Math.max(.31, (part.dimensions?.height ?? 44) / 100))
+  const moduleHeightMm = typeof part.specs.moduleHeightMm === 'number' ? part.specs.moduleHeightMm : 44
+  const stickDepth = Math.min(.56, Math.max(.31, (part.dimensions?.height ?? moduleHeightMm) / 100))
   const count = Math.max(1, Math.min(4, part.specs.memoryModules ?? 2))
   const rgb = part.specs.rgb ? mat.light() : undefined
   const finish = mat.finish(part.colors[0])
@@ -472,7 +490,7 @@ export function memory(part: Part, dim: CaseDimensions, mat: StudioMaterials, bo
     box(root, mat.zinc, [.052, .22, .093], [-stickDepth * .24, moduleHeight * .29, z], .006)
     if (rgb) box(root, rgb, [.024, moduleHeight - .10, .049], [-stickDepth * .93, 0, z], .009)
   }
-  return { root, rotors: [], lights: rgb ? [{ material: rgb }] : [], dimensions: [stickDepth, moduleHeight, .107 * count] }
+  return { root, rotors: [], lights: rgb ? [{ material: rgb }] : [], dimensions: [stickDepth, moduleHeight, count === 2 ? .288 : .086 + .107 * (count - 1)] }
 }
 
 function gpuShroud(depth: number, width: number, material: THREE.Material) {
@@ -565,8 +583,11 @@ export function cooling(
 
   if (!radiatorMm) {
     const h = (part.specs.coolerHeightMm ?? 155) / 100
-    const finWidth = Math.min(1.43, (part.dimensions?.width ?? 132) / 100)
-    const finDepth = (part.dimensions?.depth ?? 118) / 100
+    const finWidth = (part.dimensions?.width ?? 132) / 100
+    const physicalDepth = typeof part.specs.sceneDepthMm === 'number'
+      ? part.specs.sceneDepthMm
+      : part.id === 'thermalright-peerless-assassin-120-se' ? 135 : part.dimensions?.depth ?? 118
+    const finDepth = physicalDepth / 100
     const fanSize = Math.min(finWidth, (part.specs.fanSizeMm ?? 120) / 100)
     const fan = fanModule(fanSize, mat, rgb)
     fan.root.rotateY(-Math.PI / 2)
@@ -587,28 +608,38 @@ export function cooling(
       tubing(root, mat.copper, [[0, .23, z], [-.18, .31, z], [-.49, finWidth * .30, z], [-h * .82, finWidth * .39, z]], .037, 14)
     }
     box(root, mat.zinc, [.07, .45, .45], [-.033, 0, 0], .016)
-    return { root, rotors, lights }
+    return { root, rotors, lights, dimensions: [h, finWidth, finDepth] }
   }
 
-  const pumpRadius = Math.min(.405, Math.max(.32, (part.dimensions?.width ?? 77) / 200))
+  const pumpGroup = new THREE.Group()
+  root.add(pumpGroup)
+  const pumpWidth = typeof part.specs.pumpWidthMm === 'number' ? part.specs.pumpWidthMm / 100 : .78
+  const pumpDepth = typeof part.specs.pumpDepthMm === 'number' ? part.specs.pumpDepthMm / 100 : .78
+  const pumpHeight = typeof part.specs.pumpHeightMm === 'number' ? part.specs.pumpHeightMm / 100 : .38
+  const pumpRadius = Math.min(.43, Math.max(.31, pumpWidth / 2))
+  const assetMounts: AssetMount[] = [
+    { name: 'pump', target: pumpGroup, size: [pumpHeight, pumpWidth, pumpDepth], center: [-pumpHeight / 2, 0, 0] },
+  ]
   const ring = rgb ? mat.light() : mat.edge
-  const pump = cylinders(root, mat.plastic, pumpRadius, .30, [new THREE.Vector3(-.19, 0, 0)], 'x')
+  const pump = cylinders(pumpGroup, mat.plastic, pumpRadius, .30, [new THREE.Vector3(-.19, 0, 0)], 'x')
   pump.name = 'coolant-pump'
-  cylinders(root, mat.dark, pumpRadius * .87, .022, [new THREE.Vector3(-.341, 0, 0)], 'x')
-  cylinders(root, mat.glass, pumpRadius * .66, .023, [new THREE.Vector3(-.355, 0, 0)], 'x')
-  const bezel = mesh(root, new THREE.TorusGeometry(pumpRadius * .835, .015, 7, 48), ring, [-.362, 0, 0])
+  cylinders(pumpGroup, mat.dark, pumpRadius * .87, .022, [new THREE.Vector3(-.341, 0, 0)], 'x')
+  cylinders(pumpGroup, mat.glass, pumpRadius * .66, .023, [new THREE.Vector3(-.355, 0, 0)], 'x')
+  const bezel = mesh(pumpGroup, new THREE.TorusGeometry(pumpRadius * .835, .015, 7, 48), ring, [-.362, 0, 0])
   bezel.rotateY(Math.PI / 2)
-  stripLabels(root, mat, part.brand.toUpperCase(), pumpRadius * 1.23, .151, [-.378, 0, 0], 'side', '#dde0e9')
+  stripLabels(pumpGroup, mat, part.brand.toUpperCase(), pumpRadius * 1.23, .151, [-.378, 0, 0], 'side', '#dde0e9')
   if (rgb) lights.push({ material: ring })
 
   const rad = new THREE.Group()
   const radSize = radiatorMm / 100
-  const radDepth = radSize + .19
+  const radDepth = (part.dimensions?.depth ?? radiatorMm + 25) / 100
   const thick = (part.specs.radiatorThicknessMm ?? 27) / 100
   const fanQty = Math.max(1, Math.min(3, Math.round(radiatorMm / 120)))
-  const radWidth = radiatorMm % 140 === 0 ? 1.40 : 1.20
+  const fanWidth = (part.specs.fanSizeMm ?? (radiatorMm % 140 === 0 ? 140 : 120)) / 100
+  const radWidth = (part.dimensions?.width ?? fanWidth * 100) / 100
+  const fanThickness = typeof part.specs.fanThicknessMm === 'number' ? part.specs.fanThicknessMm / 100 : .25
   const place = radiatorMount
-  if (!place) return { root, rotors, lights }
+  if (!place) return { root, rotors, lights, assetMounts }
   const topWorld = new THREE.Vector3(Math.min(0, -w * .055), top - thick / 2 - .1, back + radDepth / 2 + .24)
   const world = place === 'top' ? topWorld
     : new THREE.Vector3(0, top - radDepth / 2 - .35, place === 'rear' ? back + thick / 2 : front - thick / 2 - .10)
@@ -619,6 +650,10 @@ export function cooling(
   if (place === 'side') rad.rotation.set(Math.PI / 2, 0, -Math.PI / 2, 'ZYX')
   rad.position.copy(world).sub(root.position)
   root.add(rad)
+  assetMounts.push({
+    name: 'radiator', target: rad, size: [Math.max(radWidth, fanWidth), thick + fanThickness, radDepth],
+    center: [0, -fanThickness / 2, 0],
+  })
   box(rad, mat.dark, [radWidth + .075, thick, radDepth], [0, 0, 0], .032)
   box(rad, mat.edge, [.04, thick, radDepth - .08], [-radWidth * .5, 0, 0], .012)
   box(rad, mat.edge, [.04, thick, radDepth - .08], [radWidth * .5, 0, 0], .012)
@@ -630,31 +665,46 @@ export function cooling(
   }
   rad.add(fins)
   for (let i = 0; i < fanQty; i++) {
-    const fan = fanModule(radWidth * .97, mat, rgb)
+    const fan = fanModule(fanWidth * .97, mat, rgb)
     horizontal(fan.root, false)
-    fan.root.position.set(0, -thick / 2 - .125, -radSize / 2 + radSize * (i + .5) / fanQty)
+    fan.root.position.set(0, -thick / 2 - fanThickness / 2, -radSize / 2 + radSize * (i + .5) / fanQty)
     rad.add(fan.root)
     rotors.push(...fan.rotors)
     lights.push(...fan.lights)
   }
 
-  for (let i = 0; i < 2; i++) {
-    const z = (i === 0 ? .18 : .32)
-    const end = new THREE.Vector3(-radWidth * .35 + i * .16, -thick * .13, radDepth * .47).applyQuaternion(rad.quaternion).add(rad.position)
-    const toTop = place === 'top'
-    const y = -.15 - i * .095
-    const sweep = end.z - (place === 'rear' ? -.41 : .27)
-    const points: [number, number, number][] = [
-      [-.185, y, z],
-      [-.34, y - .10, z + .22],
-      [Math.min(-.56 - i * .10, end.x - .10), toTop ? .11 : y + .6, sweep - .31],
-      [end.x - .12, end.y - (toTop ? .34 : .14), sweep],
-      [end.x, end.y, end.z],
-    ]
-    tubing(root, mat.tube, points, .064, 32)
-    tubing(root, mat.plastic, points.slice(0, 2), .079, 7)
+  const tubeGroup = new THREE.Group()
+  tubeGroup.name = 'coolant-hoses'
+  root.add(tubeGroup)
+  const defaultPump = [new THREE.Vector3(-.185, -.15, .18), new THREE.Vector3(-.185, -.245, .32)]
+  const defaultRadiator = Array.from({ length: 2 }, (_, i) => (
+    new THREE.Vector3(-radWidth * .35 + i * .16, -thick * .13, radDepth * .47).applyQuaternion(rad.quaternion).add(rad.position)
+  ))
+
+  function updateTubes(pumpPorts: THREE.Vector3[], radiatorPorts: THREE.Vector3[]) {
+    for (const object of [...tubeGroup.children]) {
+      if (object instanceof THREE.Mesh) object.geometry.dispose()
+      tubeGroup.remove(object)
+    }
+    for (let i = 0; i < 2; i++) {
+      const start = pumpPorts[i] ?? defaultPump[i]
+      const end = radiatorPorts[i] ?? defaultRadiator[i]
+      const toTop = place === 'top'
+      const sweep = end.z - (place === 'rear' ? -.41 : .27)
+      const points: [number, number, number][] = [
+        [start.x, start.y, start.z],
+        [start.x - .15, start.y - .10, start.z + .22],
+        [Math.min(start.x - .38 - i * .10, end.x - .10), toTop ? .11 : start.y + .6, sweep - .31],
+        [end.x - .12, end.y - (toTop ? .34 : .14), sweep],
+        [end.x, end.y, end.z],
+      ]
+      tubing(tubeGroup, mat.tube, points, .064, 32)
+      tubing(tubeGroup, mat.plastic, points.slice(0, 2), .079, 7)
+    }
   }
-  return { root, rotors, lights }
+
+  updateTubes(defaultPump, defaultRadiator)
+  return { root, rotors, lights, assetMounts, updateTubes }
 }
 
 export function powerSupply(part: Part, dim: CaseDimensions, mat: StudioMaterials): ModelDetail {
@@ -662,7 +712,10 @@ export function powerSupply(part: Part, dim: CaseDimensions, mat: StudioMaterial
   const depth = (part.specs.psuLengthMm ?? part.dimensions?.depth ?? 140) / 100
   const width = (part.dimensions?.width ?? 150) / 100
   const height = (part.dimensions?.height ?? 86) / 100
-  root.position.set(0, dim.floor + height / 2, dim.back + depth / 2 + .025)
+  if (dim.verticalPsu) {
+    root.position.set(.70, 1.03, dim.back + depth / 2 + .035)
+    root.rotateZ(Math.PI / 2)
+  } else root.position.set(0, dim.floor + height / 2, dim.back + depth / 2 + .025)
   box(root, mat.painted, [width, height, depth], [0, 0, 0], .039)
   vent(root, mat, width * .9, depth * .84, [8, 7], [0, height / 2 + .003, -.04], 'top')
   const ventRear = vent(root, mat, width * .87, height * .74, [8, 4], [0, 0, -depth / 2 - .002])
@@ -679,7 +732,7 @@ export function storageDrive(part: Part, dim: CaseDimensions, mat: StudioMateria
   const length = (isM2 ? part.specs.storageLengthMm ?? 80 : part.dimensions?.depth ?? 100) / 100
   const width = (isM2 ? 22 : part.dimensions?.width ?? 70) / 100
   const boardDims = boardSize(board)
-  const thickness = isM2 ? (part.dimensions?.depth ?? 2.38) / 100 : (part.dimensions?.height ?? 7) / 100
+  const thickness = (part.dimensions?.height ?? (isM2 ? 2.38 : 7)) / 100
   root.position.set(dim.tray - .141, dim.boardY - boardDims.height * .075, dim.boardZ - boardDims.width * .09)
   if (!isM2) root.position.set(dim.tray + .1, dim.floor + .46, dim.front - .8)
   box(root, isM2 ? mat.pcb : mat.painted, [thickness, width, length], [0, 0, 0], .01)
@@ -721,8 +774,8 @@ export function powerCables(
       [x - .16, y + .15, z + .1 + off],
       [x - .28, y + .055, z + .19 + off],
       [x - .32, y - .17, z + .29 + off],
-      [x - .26, dim.pan + .22, z + .38 + off],
-      [x - .15, dim.pan - .035, z + .47 + off],
+      [dim.verticalPsu ? dim.tray - .4 : x - .26, dim.pan + .22, z + .38 + off],
+      [dim.verticalPsu ? dim.tray + .12 : x - .15, dim.pan - .035, z + .47 + off],
     ], .016, 22)
   }
   box(root, mat.dark, [.09, .041, .27], [x - .289, y - .053, z + .313], .009)

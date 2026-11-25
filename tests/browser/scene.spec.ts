@@ -16,6 +16,7 @@ test('renders the local model and keeps critical 3D controls operational', async
   await expect(page.locator('.scene-mount')).toHaveAttribute('data-ready', 'true', { timeout: 40_000 })
   await expect.poll(() => models.has('nzxt-h5-flow-2024.glb'), { timeout: 20_000 }).toBeTruthy()
   await expect.poll(() => models.has('asus-dual-rtx4070-super-oc.glb'), { timeout: 20_000 }).toBeTruthy()
+  await expect(page.locator('.scene-mount')).toHaveAttribute('data-loaded-models', '9', { timeout: 25_000 })
   const bounds = await canvas.boundingBox()
   expect(bounds?.width).toBeGreaterThan(500)
   await canvas.focus()
@@ -38,7 +39,28 @@ test('renders the local model and keeps critical 3D controls operational', async
   await page.getByRole('button', { name: 'Выключить компьютер' }).click()
   await expect(page.getByRole('button', { name: 'Включить компьютер' })).toBeVisible()
   await page.getByRole('button', { name: 'Включить компьютер' }).click()
-  await page.getByRole('button', { name: 'К сборке' }).click()
   await page.screenshot({ path: testInfo.outputPath('desktop.png'), timeout: 25_000 })
   expect(errors).toEqual([])
+})
+
+test('a delayed model leaves the catalog responsive and a missing asset falls back', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('lumo.current.v1', JSON.stringify({ options: { quality: 'low', animations: false } })))
+  let release = () => {}
+  const gate = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/models/samsung-990-pro-2tb.glb', async route => {
+    await gate
+    await route.abort('failed')
+  })
+  try {
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+    await page.getByRole('button', { name: 'Каталог', exact: true }).click()
+    await page.getByRole('textbox', { name: 'Поиск комплектующих' }).fill('990 PRO')
+    await expect(page.locator('.catalog-item')).toHaveCount(1)
+    await page.keyboard.press('Escape')
+    release()
+    await expect(page.getByText('Для недоступных GLB показана резервная геометрия')).toBeVisible({ timeout: 35_000 })
+    await expect(page.getByRole('button', { name: 'К итогам сборки' })).toBeEnabled()
+  } finally {
+    release()
+  }
 })
